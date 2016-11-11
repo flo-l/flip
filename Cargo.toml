@@ -1,0 +1,6 @@
+[package]
+name = "scheme"
+version = "0.1.0"
+authors = ["flo-l <lacknerflo@gmail.com>"]
+
+[dependencies]
