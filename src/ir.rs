@@ -9,6 +9,7 @@ pub enum IR {
     Ident(Rc<String>),
     List(Rc<Vec<IR>>),
     NativePlus,
+    NativeDefine,
 }
 
 impl fmt::Display for IR {
@@ -27,6 +28,7 @@ impl fmt::Display for IR {
                 res.and(write!(f, "{})", vec[last]))
             },
             &IR::NativePlus => write!(f, "[NATIVE_PROC]+"),
+            &IR::NativeDefine => write!(f, "[NATIVE_PROC]define"),
         }
     }
 }

@@ -1,6 +1,7 @@
 use super::ir::IR;
 use std::collections::BTreeMap;
 use std::hash::{Hash, SipHasher, Hasher};
+use std::mem;
 
 #[derive(Debug)]
 struct Scope {
@@ -43,22 +44,64 @@ impl Interpreter {
     }
 
     fn init(&mut self) {
-        let mut scope = Scope::new();
-        scope.add_ident(self.intern_ident("+"), IR::NativePlus);
-        self.scopes.push(scope);
+        self.scopes.push(Scope::new());
+        self.add_ident("+", &IR::NativePlus);
+        self.add_ident("define", &IR::NativeDefine);
     }
 
     fn evaluate(&mut self, ir: &IR) -> IR {
         match ir {
             &IR::List(ref vec) => {
-                let mut evaled = vec.iter().map(|ir| self.evaluate(ir));
-                match evaled.next() {
-                    None => panic!("tried to evaluate empty list"),
-                    Some(ir) => { ir.call(evaled) },
-                }
+                if vec.len() == 0 { panic!("Tried to evaluate empty list") }
+                let (first, rest) = vec.split_at(1);
+
+                let first = self.evaluate(&first[0]);
+                let rest = rest.iter();
+                self.call(&first, rest)
             }
             &IR::Ident(ref ident) => self.lookup_ident(ident).clone(),
             x => x.clone(),
+        }
+    }
+
+    fn call<'a, I>(&mut self, ir: &IR, mut args: I) -> IR
+    where I: 'a + Iterator<Item=&'a IR>,
+    {
+        match ir {
+            &IR::NativePlus => {
+                let sum = args
+                .map(|ir| self.evaluate(&ir))
+                .fold(0, |acc, i|{
+                    match i {
+                        IR::Integer(x) => acc + x,
+                        x => panic!("Tried to sum {:?}", x),
+                    }
+                });
+                IR::Integer(sum)
+            },
+            &IR::NativeDefine => {
+                let (ident, expr) = {
+                    let mut args = args.map(|ir| self.evaluate(&ir));
+                    let ident = match args.next() {
+                        Some(IR::Ident(s)) => s,
+                        Some(ir) => panic!("expected: (define <ident> <expr>), got {} as <ident>", ir),
+                        None => panic!("expected: (define <ident> <expr>), missing <ident> and <expr>")
+                    };
+                    let expr = match args.next() {
+                        Some(ir) => ir,
+                        None => panic!("expected: (define <ident> <expr>), missing <expr>")
+                    };
+                    let v: Vec<IR> = args.collect();
+                    if v.len() != 0 {
+                        panic!("expected: (define <ident> <expr>), got too many arguments: {:?}", v)
+                    }
+                    (ident, expr)
+                };
+
+                self.add_ident(&ident, &expr);
+                expr
+            }
+            x => panic!("Tried to call {:?}", x),
         }
     }
 
@@ -77,23 +120,9 @@ impl Interpreter {
         }
         panic!("Ident: {:?} not found.", ident);
     }
-}
 
-impl IR {
-    fn call<I>(&self, args: I) -> IR
-    where I: Iterator<Item=IR>,
-    {
-        match self {
-            &IR::NativePlus => {
-                let sum = args.fold(0, |acc, i|{
-                    match i {
-                        IR::Integer(x) => acc + x,
-                        x => panic!("Tried to sum {:?}", x),
-                    }
-                });
-                IR::Integer(sum)
-            },
-            x => panic!("Tried to call {:?}", x),
-        }
+    fn add_ident(&mut self, ident: &str, ir: &IR) {
+        let id = self.intern_ident(ident);
+        self.scopes.last_mut().unwrap().add_ident(id, ir.clone());
     }
 }
