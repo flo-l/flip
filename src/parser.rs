@@ -2,6 +2,7 @@ use nom::{digit, multispace};
 use std::str;
 use std::fs::File;
 use std::io::Read;
+use std::rc::Rc;
 use super::ir::IR;
 
 static UTF8_ERROR: &'static str = "File is no valid UTF8!";
@@ -34,7 +35,7 @@ fn is_valid_in_ident(x: u8) -> bool {
 named!(ident<IR>, chain!(
     peek!(none_of!("0123456789()")) ~
     x: take_while1!(is_valid_in_ident),
-    || IR::Ident((str::from_utf8(x).unwrap()).into())));
+    || IR::Ident(Rc::new((str::from_utf8(x).unwrap()).into()))));
 
 named!(integer<IR>,
     chain!(
@@ -69,7 +70,7 @@ named!(list<IR>, map!(
         tag!("("),
         list_inner,
         tag!(")")),
-    |x| IR::List(x)));
+    |x| IR::List(Rc::new(x))));
 
 pub fn parse(file: File) -> IR {
     let bytes: Vec<u8> = file.bytes().filter_map(Result::ok).collect();

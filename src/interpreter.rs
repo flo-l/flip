@@ -51,16 +51,13 @@ impl Interpreter {
     fn evaluate(&mut self, ir: &IR) -> IR {
         match ir {
             &IR::List(ref vec) => {
-                if vec.len() == 0 {
-                    panic!("tried to evaluate empty list");
-                }
-
-                let (first, rest) = vec.split_at(1);
-                match &first[0] {
-                    &IR::Ident(ref s) => { self.lookup_ident(s).call(rest) },
-                    x => x.call(rest),
+                let mut evaled = vec.iter().map(|ir| self.evaluate(ir));
+                match evaled.next() {
+                    None => panic!("tried to evaluate empty list"),
+                    Some(ir) => { ir.call(evaled) },
                 }
             }
+            &IR::Ident(ref ident) => self.lookup_ident(ident).clone(),
             x => x.clone(),
         }
     }
@@ -83,12 +80,14 @@ impl Interpreter {
 }
 
 impl IR {
-    fn call(&self, args: &[IR]) -> IR {
+    fn call<I>(&self, args: I) -> IR
+    where I: Iterator<Item=IR>,
+    {
         match self {
             &IR::NativePlus => {
-                let sum = args.iter().fold(0, |acc, i|{
+                let sum = args.fold(0, |acc, i|{
                     match i {
-                        &IR::Integer(x) => acc + x,
+                        IR::Integer(x) => acc + x,
                         x => panic!("Tried to sum {:?}", x),
                     }
                 });

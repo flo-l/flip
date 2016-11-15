@@ -1,12 +1,13 @@
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum IR {
     Bool(bool),
     Char(char),
     Integer(i64),
-    Ident(String),
-    List(Vec<IR>),
+    Ident(Rc<String>),
+    List(Rc<Vec<IR>>),
     NativePlus,
 }
 
