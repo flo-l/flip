@@ -1,18 +1,10 @@
-use nom::{digit, is_digit, is_alphabetic, multispace};
+use nom::{digit, multispace};
 use std::str;
 use std::fs::File;
 use std::io::Read;
+use super::ir::IR;
 
 static UTF8_ERROR: &'static str = "File is no valid UTF8!";
-
-#[derive(Debug)]
-pub enum IR {
-    Bool(bool),
-    Char(char),
-    Integer(i64),
-    Ident(String),
-    List(Vec<IR>),
-}
 
 named!(bool_<IR>, map!(
     alt!(
@@ -74,9 +66,9 @@ named!(list_inner< Vec<IR> >,
 
 named!(list<IR>, map!(
     delimited!(
-        char!('('),
+        tag!("("),
         list_inner,
-        char!(')')),
+        tag!(")")),
     |x| IR::List(x)));
 
 pub fn parse(file: File) -> IR {
