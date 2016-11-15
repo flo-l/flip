@@ -1,4 +1,4 @@
-use nom::{digit, multispace};
+use nom::{digit, is_digit, is_alphabetic, multispace};
 use std::str;
 use std::fs::File;
 use std::io::Read;
@@ -7,13 +7,42 @@ static UTF8_ERROR: &'static str = "File is no valid UTF8!";
 
 #[derive(Debug)]
 pub enum IR {
-    Plus,
+    Bool(bool),
+    Char(char),
     Integer(i64),
+    Ident(String),
     List(Vec<IR>),
 }
 
-named!(plus<IR>, map!(
-    char!('+'), |_| IR::Plus));
+named!(bool_<IR>, map!(
+    alt!(
+        tag!("true") |
+        tag!("false")),
+    |x|{ IR::Bool(x == b"true") }));
+
+named!(char_<IR>, chain!(
+    tag!("'") ~
+    c: take!(1) ~
+    tag!("'") ,
+    ||{ IR::Char(c[0] as char) }));
+
+
+named!(end_of_item,
+    alt!(
+        multispace |
+        tag!(")")));
+
+fn is_valid_in_ident(x: u8) -> bool {
+    (x >= 0x3A && x <= 0x7E) ||
+    (x >= 0x2A && x <= 0x2F) ||
+    (x >= 0x23 && x <= 0x27) ||
+    x == '!' as u8
+}
+
+named!(ident<IR>, chain!(
+    peek!(none_of!("0123456789()")) ~
+    x: take_while1!(is_valid_in_ident),
+    || IR::Ident((str::from_utf8(x).unwrap()).into())));
 
 named!(integer<IR>,
     chain!(
@@ -32,14 +61,13 @@ named!(item<IR>,
     chain!(
         opt!(multispace) ~
         ir: alt!(
-            plus |
+            bool_ |
+            char_ |
             integer |
+            ident |
             list) ~
-        alt!(
-            multispace |
-            peek!(tag!(")"))),
+        peek!(end_of_item),
         || ir));
-
 
 named!(list_inner< Vec<IR> >,
     many0!(item));
