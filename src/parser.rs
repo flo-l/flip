@@ -1,4 +1,4 @@
-use nom::{digit, space};
+use nom::{digit, multispace};
 use std::str;
 use std::fs::File;
 use std::io::Read;
@@ -13,11 +13,11 @@ pub enum IR {
 }
 
 named!(plus<IR>, map!(
-    tag!("+"), |_| IR::Plus));
+    char!('+'), |_| IR::Plus));
 
 named!(integer<IR>,
     chain!(
-        s: opt!(tag!("-")) ~
+        s: opt!(char!('-')) ~
         x: digit ,
         ||{
             let num: i64 = str::from_utf8(x).expect(UTF8_ERROR).parse().unwrap();
@@ -30,12 +30,14 @@ named!(integer<IR>,
 
 named!(item<IR>,
     chain!(
+        opt!(multispace) ~
         ir: alt!(
             plus |
-            integer) ~
+            integer |
+            list) ~
         alt!(
-            space |
-            not!(tag!(")"))),
+            multispace |
+            peek!(tag!(")"))),
         || ir));
 
 
