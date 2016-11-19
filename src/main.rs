@@ -10,13 +10,15 @@ mod cli;
 mod parser;
 mod value;
 mod interpreter;
+mod repl;
 
 fn main() {
-    let input_file = cli::get_args();
-    let parsed = parser::parse(input_file);
-    println!("Parsed: {}", parsed);
-
-    let mut interpreter = interpreter::Interpreter::new(parsed);
-    let ret = interpreter.start();
-    println!("{}", ret);
+    if let Some(file) = cli::get_args() {
+        let parsed = parser::parse(file);
+        let mut interpreter = interpreter::Interpreter::new(parsed);
+        let ret = interpreter.start();
+        println!("{}", ret);
+    } else {
+        repl::Repl::start();
+    }
 }

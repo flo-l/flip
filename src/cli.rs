@@ -11,20 +11,18 @@ fn file_is_present(val: String) -> Result<(), String> {
     }
 }
 
-pub fn get_args() -> File {
+pub fn get_args() -> Option<File> {
     let matches = clap_app!(myapp =>
         (version: "0.1")
         (author: "Florian Lackner <lacknerflo@gmail.com>")
         (about: "Interprets Scheme code")
-        (@arg INPUT: +required {file_is_present} "File to interpret")
+        (@arg INPUT: {file_is_present} "File to interpret")
     ).get_matches();
 
-    let input_path = matches.value_of("INPUT").unwrap(); //safe because input is required
-    match File::open(input_path) {
-        Ok(file) => file,
-        Err(err) => {
-            println!("Error opening file {:?}: {:?}", input_path, err);
-            exit(-1);
-        }
-    }
+    matches.value_of("INPUT")
+    .map(File::open)
+    .map(|x| x.unwrap_or_else(|err| {
+        println!("Error opening file: {}", err);
+        exit(-1);
+    }))
 }
