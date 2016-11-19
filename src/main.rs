@@ -1,9 +1,7 @@
-#[macro_use]
-extern crate clap;
+#[macro_use] extern crate clap;
+#[macro_use] extern crate nom;
 
-#[macro_use]
-extern crate nom;
-
+extern crate rustyline;
 extern crate siphasher;
 
 mod cli;
@@ -12,12 +10,12 @@ mod value;
 mod interpreter;
 mod repl;
 
+use std::io::Read;
+
 fn main() {
     if let Some(file) = cli::get_args() {
-        let parsed = parser::parse(file);
-        let mut interpreter = interpreter::Interpreter::new(parsed);
-        let ret = interpreter.start();
-        println!("{}", ret);
+        let input: Vec<u8> = file.bytes().filter_map(Result::ok).collect();
+        println!("{}", repl::parse_and_compile(&input));
     } else {
         repl::Repl::start();
     }

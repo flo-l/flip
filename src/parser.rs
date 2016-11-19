@@ -1,7 +1,5 @@
 use nom::{digit, multispace};
 use std::str;
-use std::fs::File;
-use std::io::Read;
 use super::value::Value;
 
 static UTF8_ERROR: &'static str = "File is no valid UTF8!";
@@ -52,14 +50,14 @@ named!(integer<Value>,
 named!(item<Value>,
     chain!(
         opt!(multispace) ~
-        Value: alt!(
+        value: alt!(
             bool_ |
             char_ |
             integer |
             ident |
             list) ~
         peek!(end_of_item),
-        || Value));
+        || value));
 
 named!(list_inner< Vec<Value> >,
     many0!(item));
@@ -71,7 +69,6 @@ named!(list<Value>, map!(
         tag!(")")),
     |x| Value::new_list(x)));
 
-pub fn parse(file: File) -> Value {
-    let bytes: Vec<u8> = file.bytes().filter_map(Result::ok).collect();
-    list(&bytes).unwrap().1
+pub fn parse(input: &[u8]) -> Value {
+    list(input).unwrap().1
 }
