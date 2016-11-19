@@ -1,26 +1,28 @@
-use nom::{digit, multispace};
+use nom::{digit, multispace, ErrorKind};
 use std::str;
 use super::value::Value;
 
 static UTF8_ERROR: &'static str = "File is no valid UTF8!";
 
-named!(bool_<Value>, map!(
+named!(bool_<&[u8], Value, ParserError>, fix_error!(ParserError, map!(
     alt!(
         tag!("true") |
         tag!("false")),
-    |x|{ Value::new_bool(x == b"true") }));
+    |x|{ Value::new_bool(x == b"true") })));
 
-named!(char_<Value>, chain!(
+named!(char_<&[u8], Value, ParserError>, fix_error!(ParserError, chain!(
     tag!("'") ~
+    error!(ErrorKind::Custom(ParserError::MissingChar), not!(tag!("'"))) ~
     c: take!(1) ~
-    tag!("'") ,
-    ||{ Value::new_char(c[0] as char) }));
+    error!(ErrorKind::Custom(ParserError::MultipleChars),
+        fix_error!(ParserError, tag!("'"))) ,
+    ||{ Value::new_char(c[0] as char) })));
 
 
-named!(end_of_item,
-    alt!(
+named!(end_of_item<&[u8], &[u8], ParserError>,
+    fix_error!(ParserError, alt!(
         multispace |
-        tag!(")")));
+        tag!(")"))));
 
 fn is_valid_in_ident(x: u8) -> bool {
     (x >= 0x3A && x <= 0x7E) ||
@@ -29,13 +31,13 @@ fn is_valid_in_ident(x: u8) -> bool {
     x == '!' as u8
 }
 
-named!(ident<Value>, chain!(
+named!(ident<&[u8], Value, ParserError>, fix_error!(ParserError, chain!(
     peek!(none_of!("0123456789()")) ~
     x: take_while1!(is_valid_in_ident),
-    || Value::new_ident((str::from_utf8(x).unwrap()).into())));
+    || Value::new_ident((str::from_utf8(x).unwrap()).into()))));
 
-named!(integer<Value>,
-    chain!(
+named!(integer<&[u8], Value, ParserError>,
+    fix_error!(ParserError, chain!(
         s: opt!(char!('-')) ~
         x: digit ,
         ||{
@@ -45,9 +47,9 @@ named!(integer<Value>,
             } else {
                 Value::new_integer(num)
             }
-        }));
+        })));
 
-named!(item<Value>,
+named!(item<&[u8], Value, ParserError>,
     chain!(
         opt!(multispace) ~
         value: alt!(
@@ -59,16 +61,90 @@ named!(item<Value>,
         peek!(end_of_item),
         || value));
 
-named!(list_inner< Vec<Value> >,
+named!(list_inner<Vec<Value> >,
     many0!(item));
 
-named!(list<Value>, map!(
-    delimited!(
-        tag!("("),
-        list_inner,
-        tag!(")")),
-    |x| Value::new_list(x)));
+named!(list<&[u8], Value, ParserError>,
+    fix_error!(ParserError, map!(
+        delimited!(
+            tag!("("),
+            list_inner,
+            tag!(")")),
+        |x| Value::new_list(x))));
 
 pub fn parse(input: &[u8]) -> Value {
     list(input).unwrap().1
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ParserError {
+    MultipleChars, // more than 1 character between '', eg. 'ab'
+    MissingChar,   // no char between '', eg. ''
+}
+
+#[cfg(test)]
+mod test {
+    use super::{ParserError, bool_, char_};
+    use nom::{IResult, Err, ErrorKind};
+    use super::super::value::Value;
+
+    macro_rules! expect_error {
+        // with error kind
+        ($parser:ident, $input:expr, $pos:expr, $errorkind:expr) => (
+            let input = $input.as_bytes();
+            let error_pos = &input[$pos..];
+            let res = $parser(input);
+            assert!(match res {
+                IResult::Error(
+                    Err::NodePosition(
+                        ErrorKind::Custom(kind),
+                        pos,
+                        ref boxed_err)
+                ) if (pos == error_pos && kind == $errorkind) => {
+                    match &**boxed_err {
+                        &Err::Position(_, pos) if pos == error_pos => true,
+                        _ => false,
+                    }
+                },
+                _ => false
+            });
+        );
+        // without error kind
+        ($parser:ident, $input:expr, $pos:expr) => (
+            let input = $input.as_bytes();
+            let error_pos = &input[$pos..];
+            assert!(match $parser(input) {
+                IResult::Error(Err::Position(_, pos)) if pos == error_pos => true,
+                _ => false,
+            });
+        )
+    }
+
+    macro_rules! expect_ok {
+        ($parser:ident, $input:expr, $expected:expr) => (
+            let input = $input.as_bytes();
+            assert_eq!(
+                $parser(input),
+                IResult::Done(&[][..], $expected));
+    )}
+
+    #[test]
+    fn bool() {
+        expect_ok!(bool_, "true", Value::new_bool(true));
+        expect_ok!(bool_, "false", Value::new_bool(false));
+        expect_error!(bool_, "trude", 0);
+        expect_error!(bool_, "fale", 0);
+    }
+
+    #[test]
+    fn char() {
+        use std::u8;
+        for x in 0..127 {
+            if x == '\'' as u8 { continue } // skip ''', which is invalid (tested below)
+            let input = String::from_utf8(vec!['\'' as u8, x, '\'' as u8]).unwrap();
+            expect_ok!(char_, input, Value::new_char(x as char));
+        }
+        expect_error!(char_, "'ab'", 2, ParserError::MultipleChars);
+        expect_error!(char_, "''", 1, ParserError::MissingChar);
+    }
 }

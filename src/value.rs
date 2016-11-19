@@ -1,7 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Value {
     val_ptr: Rc<ValueData>
 }
@@ -35,7 +35,7 @@ impl fmt::Display for Value {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ValueData {
     Bool(bool),
     Char(char),
