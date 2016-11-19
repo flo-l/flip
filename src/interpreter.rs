@@ -1,11 +1,11 @@
-use super::ir::IR;
+use super::value::{Value, ValueData};
 use std::collections::BTreeMap;
-use std::hash::{Hash, SipHasher, Hasher};
-use std::mem;
+use std::hash::{Hash, Hasher};
+use siphasher::sip::SipHasher24 as SipHasher;
 
 #[derive(Debug)]
 struct Scope {
-    idents: BTreeMap<u64, IR>,
+    idents: BTreeMap<u64, Value>,
 }
 
 impl Scope {
@@ -15,43 +15,47 @@ impl Scope {
         }
     }
 
-    fn lookup_ident(&self, id: u64) -> Option<&IR> {
-        self.idents.get(&id)
+    fn lookup_ident(&self, id: u64) -> Option<Value> {
+        self.idents.get(&id).cloned()
     }
 
-    fn add_ident(&mut self, id: u64, ir: IR) {
-        self.idents.insert(id, ir);
+    fn add_ident(&mut self, id: u64, value: Value) {
+        self.idents.insert(id, value);
+    }
+
+    fn idents(&self) -> &BTreeMap<u64, Value> {
+        &self.idents
     }
 }
 
 pub struct Interpreter {
-    ir: Option<IR>,
+    starting_point: Option<Value>,
     scopes: Vec<Scope>,
 }
 
 impl Interpreter {
-    pub fn new(ir: IR) -> Self {
+    pub fn new(value: Value) -> Self {
         Interpreter{
-            ir: Some(ir),
+            starting_point: Some(value),
             scopes: vec![],
         }
     }
 
-    pub fn start(&mut self) -> IR {
+    pub fn start(&mut self) -> Value {
         self.init();
-        let mut ir = self.ir.take().unwrap();
-        self.evaluate(&mut ir)
+        let mut value = self.starting_point.take().unwrap();
+        self.evaluate(&mut value)
     }
 
     fn init(&mut self) {
         self.scopes.push(Scope::new());
-        self.add_ident("+", &IR::NativePlus);
-        self.add_ident("define", &IR::NativeDefine);
+        self.add_ident("+", Value::new_native_plus());
+        self.add_ident("define", Value::new_native_define());
     }
 
-    fn evaluate(&mut self, ir: &IR) -> IR {
-        match ir {
-            &IR::List(ref vec) => {
+    fn evaluate(&mut self, value: &Value) -> Value {
+        match value.data() {
+            &ValueData::List(ref vec) => {
                 if vec.len() == 0 { panic!("Tried to evaluate empty list") }
                 let (first, rest) = vec.split_at(1);
 
@@ -59,46 +63,47 @@ impl Interpreter {
                 let rest = rest.iter();
                 self.call(&first, rest)
             }
-            &IR::Ident(ref ident) => self.lookup_ident(ident).clone(),
-            x => x.clone(),
+            &ValueData::Ident(ref ident) => self.lookup_ident(ident).clone(),
+            _ => value.clone(),
         }
     }
 
-    fn call<'a, I>(&mut self, ir: &IR, mut args: I) -> IR
-    where I: 'a + Iterator<Item=&'a IR>,
+    fn call<'a, I>(&mut self, value: &Value, args: I) -> Value
+    where I: 'a + Iterator<Item=&'a Value>,
     {
-        match ir {
-            &IR::NativePlus => {
+        match value.data() {
+            &ValueData::NativePlus => {
                 let sum = args
-                .map(|ir| self.evaluate(&ir))
+                .map(|value| self.evaluate(&value))
                 .fold(0, |acc, i|{
-                    match i {
-                        IR::Integer(x) => acc + x,
+                    match i.data() {
+                        &ValueData::Integer(x) => acc + x,
                         x => panic!("Tried to sum {:?}", x),
                     }
                 });
-                IR::Integer(sum)
+                Value::new_integer(sum)
             },
-            &IR::NativeDefine => {
+            &ValueData::NativeDefine => {
+                println!("hi");
                 let (ident, expr) = {
-                    let mut args = args.map(|ir| self.evaluate(&ir));
-                    let ident = match args.next() {
-                        Some(IR::Ident(s)) => s,
-                        Some(ir) => panic!("expected: (define <ident> <expr>), got {} as <ident>", ir),
+                    let mut args = args.map(|value| self.evaluate(&value));
+                    let ident = match args.next().map(|x| x.into_data()) {
+                        Some(ValueData::Ident(s)) => s,
+                        Some(value) => panic!("expected: (define <ident> <expr>), got {} as <ident>", value),
                         None => panic!("expected: (define <ident> <expr>), missing <ident> and <expr>")
                     };
                     let expr = match args.next() {
-                        Some(ir) => ir,
+                        Some(value) => value,
                         None => panic!("expected: (define <ident> <expr>), missing <expr>")
                     };
-                    let v: Vec<IR> = args.collect();
+                    let v: Vec<Value> = args.collect();
                     if v.len() != 0 {
                         panic!("expected: (define <ident> <expr>), got too many arguments: {:?}", v)
                     }
                     (ident, expr)
                 };
 
-                self.add_ident(&ident, &expr);
+                self.add_ident(&ident, expr.clone());
                 expr
             }
             x => panic!("Tried to call {:?}", x),
@@ -111,18 +116,25 @@ impl Interpreter {
         s.finish()
     }
 
-    fn lookup_ident(&self, ident: &str) -> &IR {
+    fn lookup_ident(&self, ident: &str) -> Value {
         let id = self.intern_ident(ident);
         for scope in self.scopes.iter().rev() {
-            if let Some(ir) = scope.lookup_ident(id) {
-                return ir;
+            if let Some(value) = scope.lookup_ident(id) {
+                return value.clone();
+            }
+        }
+        println!("Searched Ident: {:?}", id);
+        println!("Known Idents: ");
+        for x in &self.scopes {
+            for (hash, value) in &x.idents {
+                println!("({:?}) => {:?}", hash, value);
             }
         }
         panic!("Ident: {:?} not found.", ident);
     }
 
-    fn add_ident(&mut self, ident: &str, ir: &IR) {
+    fn add_ident(&mut self, ident: &str, value: Value) {
         let id = self.intern_ident(ident);
-        self.scopes.last_mut().unwrap().add_ident(id, ir.clone());
+        self.scopes.last_mut().unwrap().add_ident(id, value);
     }
 }

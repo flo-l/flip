@@ -4,9 +4,11 @@ extern crate clap;
 #[macro_use]
 extern crate nom;
 
+extern crate siphasher;
+
 mod cli;
 mod parser;
-mod ir;
+mod value;
 mod interpreter;
 
 fn main() {

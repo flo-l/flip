@@ -2,22 +2,21 @@ use nom::{digit, multispace};
 use std::str;
 use std::fs::File;
 use std::io::Read;
-use std::rc::Rc;
-use super::ir::IR;
+use super::value::Value;
 
 static UTF8_ERROR: &'static str = "File is no valid UTF8!";
 
-named!(bool_<IR>, map!(
+named!(bool_<Value>, map!(
     alt!(
         tag!("true") |
         tag!("false")),
-    |x|{ IR::Bool(x == b"true") }));
+    |x|{ Value::new_bool(x == b"true") }));
 
-named!(char_<IR>, chain!(
+named!(char_<Value>, chain!(
     tag!("'") ~
     c: take!(1) ~
     tag!("'") ,
-    ||{ IR::Char(c[0] as char) }));
+    ||{ Value::new_char(c[0] as char) }));
 
 
 named!(end_of_item,
@@ -32,47 +31,47 @@ fn is_valid_in_ident(x: u8) -> bool {
     x == '!' as u8
 }
 
-named!(ident<IR>, chain!(
+named!(ident<Value>, chain!(
     peek!(none_of!("0123456789()")) ~
     x: take_while1!(is_valid_in_ident),
-    || IR::Ident(Rc::new((str::from_utf8(x).unwrap()).into()))));
+    || Value::new_ident((str::from_utf8(x).unwrap()).into())));
 
-named!(integer<IR>,
+named!(integer<Value>,
     chain!(
         s: opt!(char!('-')) ~
         x: digit ,
         ||{
             let num: i64 = str::from_utf8(x).expect(UTF8_ERROR).parse().unwrap();
             if s.is_some() {
-                IR::Integer(-num)
+                Value::new_integer(-num)
             } else {
-                IR::Integer(num)
+                Value::new_integer(num)
             }
         }));
 
-named!(item<IR>,
+named!(item<Value>,
     chain!(
         opt!(multispace) ~
-        ir: alt!(
+        Value: alt!(
             bool_ |
             char_ |
             integer |
             ident |
             list) ~
         peek!(end_of_item),
-        || ir));
+        || Value));
 
-named!(list_inner< Vec<IR> >,
+named!(list_inner< Vec<Value> >,
     many0!(item));
 
-named!(list<IR>, map!(
+named!(list<Value>, map!(
     delimited!(
         tag!("("),
         list_inner,
         tag!(")")),
-    |x| IR::List(Rc::new(x))));
+    |x| Value::new_list(x)));
 
-pub fn parse(file: File) -> IR {
+pub fn parse(file: File) -> Value {
     let bytes: Vec<u8> = file.bytes().filter_map(Result::ok).collect();
     list(&bytes).unwrap().1
 }

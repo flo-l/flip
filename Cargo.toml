@@ -6,3 +6,4 @@ authors = ["flo-l <lacknerflo@gmail.com>"]
 [dependencies]
 clap = "2"
 nom = "^1.2.4"
+siphasher = "0.1.2"
