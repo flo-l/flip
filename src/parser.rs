@@ -255,4 +255,9 @@ mod test {
         expect_error!(pair, "(1 . 2 . 3)", 0, ParserError::InvalidPair);
         expect_error!(pair, "(1 2 . 3)", 0, ParserError::InvalidPair);
     }
+
+    //TODO
+    fn item_() {
+        // add test, eg. "1 1" should not parse as item
+    }
 }
