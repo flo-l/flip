@@ -4,9 +4,7 @@ use super::parser;
 use rustyline::{self, line_buffer};
 use std::iter;
 
-pub struct Repl {
-
-}
+pub struct Repl {}
 
 impl Repl {
     pub fn start() {
@@ -32,7 +30,7 @@ impl Repl {
 struct ParensCloser {}
 
 impl rustyline::completion::Completer for ParensCloser {
-    fn complete(&self, line: &str, pos: usize) -> rustyline::Result<(usize, Vec<String>)> {
+    fn complete(&self, line: &str, _: usize) -> rustyline::Result<(usize, Vec<String>)> {
         let unclosed_parens = line.chars()
         .fold(0, |n, c| if c == '(' { n + 1 } else if c == ')' { n - 1 } else { n });
         let missing_parens: String = iter::repeat(')').take(unclosed_parens).collect();

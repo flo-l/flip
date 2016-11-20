@@ -59,7 +59,7 @@ named!(integer<&[u8], Value, ParserError>,
         })));
 
 named!(item<&[u8], Value, ParserError>,
-    chain!(
+    complete!(chain!(
         opt!(multispace) ~
         value: alt_complete!(
             bool_ |
@@ -69,7 +69,7 @@ named!(item<&[u8], Value, ParserError>,
             pair |
             list) ~
         peek!(end_of_item),
-        || value));
+        || value)));
 
 named!(pair<&[u8], Value, ParserError>,
     error!(ErrorKind::Custom(ParserError::InvalidPair), complete!(delimited!(
@@ -106,9 +106,14 @@ named!(list<&[u8], Value, ParserError>,
 
 pub fn parse(input: &[u8]) -> Result<Value, String> {
     use nom::Err as NomErr;
-    named!(complete_item<&[u8], Value, ParserError>, complete!(item));
-    match complete_item(input) {
-        IResult::Done(_, value) => Ok(value),
+    match item(input) {
+        IResult::Done(remaining, value) => {
+            if remaining.len() > 0 {
+                Err(format!("error, expected EOF, found: {}", str::from_utf8(remaining).unwrap()))
+            } else {
+                Ok(value)
+            }
+        },
         IResult::Incomplete(_) => unimplemented!(), // because of complete
         IResult::Error(NomErr::Position(err, _)) => Err(create_error_string(err)),
         IResult::Error(NomErr::NodePosition(err, _, _)) => Err(create_error_string(err)),
@@ -130,14 +135,16 @@ enum ParserError {
     MultipleChars, // more than 1 character between '', eg. 'ab'
     MissingChar,   // no char between '', eg. ''
     InvalidPair,   // eg. (1 2 . 3) or (1 . 2 3)
+    InvalidItem,   // eg. 1 2
 }
 
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ParserError::MultipleChars => write!(f, "more than one character between ''"), // more than 1 character between '', eg. 'ab'
-            ParserError::MissingChar => write!(f, "no character between ''"),   // no char between '', eg. ''
-            ParserError::InvalidPair => write!(f, "invalid pair"),   // eg. (1 2 . 3) or (1 . 2 3)
+            ParserError::MultipleChars => write!(f, "more than one character between ''"),
+            ParserError::MissingChar => write!(f, "no character between ''"),
+            ParserError::InvalidPair => write!(f, "invalid pair"),
+            ParserError::InvalidItem => write!(f, "invalid item"),
         }
     }
 }
@@ -258,6 +265,7 @@ mod test {
 
     //TODO
     fn item_() {
-        // add test, eg. "1 1" should not parse as item
+        expect_error!(item, "1 1", 1, ParserError::InvalidItem);
+
     }
 }
