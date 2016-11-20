@@ -4,23 +4,30 @@ use super::value::Value;
 
 static UTF8_ERROR: &'static str = "File is no valid UTF8!";
 
-named!(bool_<&[u8], Value, ParserError>, fix_error!(ParserError, map!(
+macro_rules! fix {
+    ($i:expr, $it:ident) => (fix_error!($i, ParserError, $it));
+    ($i:expr, $submac:ident!( $($args:tt)* )) => (
+      fix_error!($i, ParserError, $submac!($($args)*))
+    );
+}
+
+named!(bool_<&[u8], Value, ParserError>, fix!(map!(
     alt!(
         tag!("true") |
         tag!("false")),
     |x|{ Value::new_bool(x == b"true") })));
 
-named!(char_<&[u8], Value, ParserError>, fix_error!(ParserError, chain!(
+named!(char_<&[u8], Value, ParserError>, fix!(chain!(
     tag!("'") ~
     error!(ErrorKind::Custom(ParserError::MissingChar), not!(tag!("'"))) ~
     c: take!(1) ~
     error!(ErrorKind::Custom(ParserError::MultipleChars),
-        fix_error!(ParserError, tag!("'"))) ,
+        fix!(tag!("'"))) ,
     ||{ Value::new_char(c[0] as char) })));
 
 
 named!(end_of_item<&[u8], &[u8], ParserError>,
-    fix_error!(ParserError, alt!(
+    fix!(alt!(
         multispace |
         tag!(")"))));
 
@@ -31,13 +38,13 @@ fn is_valid_in_ident(x: u8) -> bool {
     x == '!' as u8
 }
 
-named!(ident<&[u8], Value, ParserError>, fix_error!(ParserError, chain!(
+named!(ident<&[u8], Value, ParserError>, fix!(chain!(
     peek!(none_of!("0123456789()")) ~
     x: take_while1!(is_valid_in_ident),
     || Value::new_ident((str::from_utf8(x).unwrap())))));
 
 named!(integer<&[u8], Value, ParserError>,
-    fix_error!(ParserError, chain!(
+    fix!(chain!(
         s: opt!(char!('-')) ~
         x: digit ,
         ||{
@@ -57,23 +64,42 @@ named!(item<&[u8], Value, ParserError>,
             char_ |
             integer |
             ident |
+            pair |
             list) ~
         peek!(end_of_item),
         || value));
+
+named!(pair<&[u8], Value, ParserError>,
+    fix!(delimited!(
+            fix!(tag!("(")),
+            chain!(
+                a: item ~
+                fix!(multispace) ~
+                fix!(tag!(".")) ~
+                fix!(multispace) ~
+                b: item ,
+                || { Value::new_pair(a,b) }
+            ),
+            fix!(tag!(")")))));
 
 named!(list_inner<Vec<Value> >,
     many0!(item));
 
 named!(list<&[u8], Value, ParserError>,
-    fix_error!(ParserError, map!(
-        delimited!(
-            tag!("("),
-            list_inner,
-            tag!(")")),
-        |x| Value::new_list(x))));
+    alt!(
+        fix!(map!(
+            tag!("()") ,
+            |_| Value::empty_list())) |
+        fix!(map!(
+            delimited!(
+                tag!("("),
+                list_inner,
+                tag!(")")),
+            |x| Value::new_list(x)))
+        ));
 
 pub fn parse(input: &[u8]) -> Value {
-    list(input).unwrap().1
+    item(input).unwrap().1
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -84,7 +110,7 @@ enum ParserError {
 
 #[cfg(test)]
 mod test {
-    use super::{ParserError, bool_, char_, integer, ident};
+    use super::{ParserError, bool_, char_, integer, ident, pair, list};
     use nom::{IResult, Err, ErrorKind};
     use super::super::value::Value;
 
@@ -177,5 +203,25 @@ mod test {
         expect_ok!(ident, "//", Value::new_ident("//"));
 
         expect_error!(ident, "1a", 0);
+    }
+
+    #[test]
+    fn list_() {
+        expect_ok!(list, "()", Value::empty_list());
+        //TODO: add more tests for lists with content
+    }
+
+    #[test]
+    fn pair_() {
+        let t = Value::new_bool(true);
+        let f = Value::new_bool(false);
+        let e = Value::empty_list();
+
+        expect_ok!(pair, "(true . false)", Value::new_pair(t.clone(), f.clone()));
+        expect_ok!(pair, "(true . (false . ()))", Value::new_pair(t, Value::new_pair(f.clone(), e.clone())));
+
+        expect_error!(pair, "(1 . 2 3)", 6);
+        expect_error!(pair, "(1 . 2 . 3)", 6);
+        expect_error!(pair, "(1 2 . 3)", 3);
     }
 }
