@@ -34,7 +34,7 @@ fn is_valid_in_ident(x: u8) -> bool {
 named!(ident<&[u8], Value, ParserError>, fix_error!(ParserError, chain!(
     peek!(none_of!("0123456789()")) ~
     x: take_while1!(is_valid_in_ident),
-    || Value::new_ident((str::from_utf8(x).unwrap()).into()))));
+    || Value::new_ident((str::from_utf8(x).unwrap())))));
 
 named!(integer<&[u8], Value, ParserError>,
     fix_error!(ParserError, chain!(
@@ -84,7 +84,7 @@ enum ParserError {
 
 #[cfg(test)]
 mod test {
-    use super::{ParserError, bool_, char_};
+    use super::{ParserError, bool_, char_, integer, ident};
     use nom::{IResult, Err, ErrorKind};
     use super::super::value::Value;
 
@@ -103,10 +103,10 @@ mod test {
                 ) if (pos == error_pos && kind == $errorkind) => {
                     match &**boxed_err {
                         &Err::Position(_, pos) if pos == error_pos => true,
-                        _ => false,
+                        x => { println!("{:?}", x); false },
                     }
                 },
-                _ => false
+                x => { println!("{:?}", x); false }
             });
         );
         // without error kind
@@ -115,18 +115,25 @@ mod test {
             let error_pos = &input[$pos..];
             assert!(match $parser(input) {
                 IResult::Error(Err::Position(_, pos)) if pos == error_pos => true,
-                _ => false,
+                x => { println!("{:?}", x); false },
             });
         )
     }
 
     macro_rules! expect_ok {
-        ($parser:ident, $input:expr, $expected:expr) => (
+        // with rest
+        ($parser:ident, $input:expr, $expected:expr, $rest:expr) => (
             let input = $input.as_bytes();
+            let rest = $rest.as_bytes();
             assert_eq!(
                 $parser(input),
-                IResult::Done(&[][..], $expected));
-    )}
+                IResult::Done(rest, $expected)););
+
+        // without rest
+        ($parser:ident, $input:expr, $expected:expr) => (
+            expect_ok!($parser, $input, $expected, "");
+        )
+    }
 
     #[test]
     fn bool() {
@@ -146,5 +153,29 @@ mod test {
         }
         expect_error!(char_, "'ab'", 2, ParserError::MultipleChars);
         expect_error!(char_, "''", 1, ParserError::MissingChar);
+    }
+
+    #[test]
+    fn integer_() {
+        expect_ok!(integer, "007", Value::new_integer(7));
+        expect_ok!(integer, "-007", Value::new_integer(-7));
+        expect_ok!(integer, "123456789", Value::new_integer(123456789));
+        expect_ok!(integer, "-123456789", Value::new_integer(-123456789));
+        expect_ok!(integer, "123b456789", Value::new_integer(123), "b456789");
+        expect_ok!(integer, "123456789c", Value::new_integer(123456789), "c");
+        expect_ok!(integer, "00-7", Value::new_integer(0), "-7");
+
+        expect_error!(integer, "a123456789", 0);
+        expect_error!(integer, "--7", 1);
+    }
+
+    #[test]
+    fn ident_() {
+        expect_ok!(ident, "+", Value::new_ident("+"));
+        expect_ok!(ident, "a1a", Value::new_ident("a"), "1a");
+        expect_ok!(ident, "num->str", Value::new_ident("num->str"));
+        expect_ok!(ident, "//", Value::new_ident("//"));
+
+        expect_error!(ident, "1a", 0);
     }
 }

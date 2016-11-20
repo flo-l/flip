@@ -1,5 +1,6 @@
 use std::fmt;
 use std::rc::Rc;
+use std::borrow::Cow;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -14,8 +15,8 @@ impl Value {
     pub fn new_bool(x: bool) -> Self { Self::new_with(ValueData::Bool(x)) }
     pub fn new_char(x: char) -> Self { Self::new_with(ValueData::Char(x)) }
     pub fn new_integer(x: i64) -> Self { Self::new_with(ValueData::Integer(x)) }
-    pub fn new_ident(x: String) -> Self { Self::new_with(ValueData::Ident(x)) }
-    pub fn new_list(x: Vec<Value>) -> Self { Self::new_with(ValueData::List(x)) }
+    pub fn new_ident<'a, T: 'a + Into<Cow<'a, str>>>(x: T) -> Self { Self::new_with(ValueData::Ident(x.into().into_owned())) }
+    pub fn new_list<'a, T: 'a + Into<Cow<'a, [Value]>>>(x: T) -> Self { Self::new_with(ValueData::List(x.into().into_owned())) }
     pub fn new_native_plus() -> Self { Self::new_with(ValueData::NativePlus) }
     pub fn new_native_define() -> Self { Self::new_with(ValueData::NativeDefine) }
 
