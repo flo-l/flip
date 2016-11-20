@@ -30,6 +30,14 @@ impl Value {
             Err(rc) => (*rc).clone(),
         }
     }
+
+    fn is_pair(&self) -> bool {
+        if let &ValueData::Pair(_, _) = self.data() { true } else { false }
+    }
+
+    fn is_empty_list(&self) -> bool {
+        if let &ValueData::EmptyList = self.data() { true } else { false }
+    }
 }
 
 impl fmt::Display for Value {
@@ -58,6 +66,29 @@ impl fmt::Display for ValueData {
             &ValueData::Char(x) => write!(f, "{}", x),
             &ValueData::Integer(x) => write!(f, "{}", x),
             &ValueData::Ident(ref x) => write!(f, "{}", x),
+            &ValueData::Pair(ref a, ref b) if b.is_pair() => {
+                let mut current = b;
+                let mut res = write!(f, "({}", a);
+
+                loop {
+                    if let &ValueData::EmptyList = current.data() {
+                        res = res.and(write!(f, ")"));
+                        return res;
+                    }
+
+                    if let &ValueData::Pair(ref x, ref y) = current.data() {
+                        if y.is_pair() || y.is_empty_list() {
+                            res = res.and(write!(f, " {}", x));
+                            current = y;
+                            continue;
+                        } else {
+                            res = res.and(write!(f, " {})", current));
+                            return res;
+                        }
+                    }
+                }
+            },
+            &ValueData::Pair(ref a, ref b) if b.is_empty_list() => write!(f, "({})", a),
             &ValueData::Pair(ref a, ref b) => write!(f, "({} . {})", a, b),
             &ValueData::EmptyList => write!(f, "()"),
             &ValueData::List(ref vec) => {
@@ -71,5 +102,46 @@ impl fmt::Display for ValueData {
             &ValueData::NativePlus => write!(f, "[NATIVE_PROC]+"),
             &ValueData::NativeDefine => write!(f, "[NATIVE_PROC]define"),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{Value, ValueData};
+
+    #[test]
+    fn pair_format() {
+        fn v(x: i64) -> Value { Value::new_integer(x) }
+        let empty = Value::empty_list();
+
+        let a = Value::new_pair(v(4), empty.clone());
+        let b = Value::new_pair(v(3), a.clone());
+        let c = Value::new_pair(v(2), b.clone());
+        let d = Value::new_pair(v(1), c.clone());
+
+        assert_eq!(format!("{}", a), "(4)");
+        assert_eq!(format!("{}", b), "(3 4)");
+        assert_eq!(format!("{}", c), "(2 3 4)");
+        assert_eq!(format!("{}", d), "(1 2 3 4)");
+
+        let x = Value::new_pair(v(3), v(4));
+        let y = Value::new_pair(v(2), x.clone());
+        let z = Value::new_pair(v(1), y.clone());
+
+        assert_eq!(format!("{}", x), "(3 . 4)");
+        assert_eq!(format!("{}", y), "(2 (3 . 4))");
+        assert_eq!(format!("{}", z), "(1 2 (3 . 4))");
+
+        let r = Value::new_pair(v(4), empty.clone());
+        let s = Value::new_pair(v(2), v(3));
+        let t = Value::new_pair(s.clone(), r.clone());
+        let u = Value::new_pair(v(1), t.clone());
+        let v = Value::new_pair(v(0), u.clone());
+
+        assert_eq!(format!("{}", r), "(4)");
+        assert_eq!(format!("{}", s), "(2 . 3)");
+        assert_eq!(format!("{}", t), "((2 . 3) 4)");
+        assert_eq!(format!("{}", u), "(1 (2 . 3) 4)");
+        assert_eq!(format!("{}", v), "(0 1 (2 . 3) 4)");
     }
 }

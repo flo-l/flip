@@ -21,7 +21,10 @@ impl Repl {
             if line == quit { return }
             let result = parse_and_compile(line.as_bytes());
             rl.add_history_entry(&line);
-            println!("=> {}", result);
+            match result {
+                Ok(value) => println!("=> {}", value),
+                Err(err)  => println!("{}", err),
+            }
         }
     }
 }
@@ -37,9 +40,9 @@ impl rustyline::completion::Completer for ParensCloser {
     }
 }
 
-pub fn parse_and_compile(input: &[u8]) -> value::Value
+pub fn parse_and_compile(input: &[u8]) -> Result<value::Value, String>
 {
-    let parsed = parser::parse(input);
+    let parsed = parser::parse(input)?;
     let mut interpreter = interpreter::Interpreter::new(parsed);
-    interpreter.start()
+    Ok(interpreter.start())
 }

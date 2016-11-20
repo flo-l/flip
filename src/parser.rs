@@ -1,5 +1,6 @@
-use nom::{digit, multispace, ErrorKind};
+use nom::{digit, multispace, eof, ErrorKind, IResult};
 use std::str;
+use std::fmt;
 use super::value::Value;
 
 static UTF8_ERROR: &'static str = "File is no valid UTF8!";
@@ -29,6 +30,7 @@ named!(char_<&[u8], Value, ParserError>, fix!(chain!(
 named!(end_of_item<&[u8], &[u8], ParserError>,
     fix!(alt!(
         multispace |
+        eof |
         tag!(")"))));
 
 fn is_valid_in_ident(x: u8) -> bool {
@@ -39,7 +41,7 @@ fn is_valid_in_ident(x: u8) -> bool {
 }
 
 named!(ident<&[u8], Value, ParserError>, fix!(chain!(
-    peek!(none_of!("0123456789()")) ~
+    peek!(none_of!("0123456789().")) ~
     x: take_while1!(is_valid_in_ident),
     || Value::new_ident((str::from_utf8(x).unwrap())))));
 
@@ -59,7 +61,7 @@ named!(integer<&[u8], Value, ParserError>,
 named!(item<&[u8], Value, ParserError>,
     chain!(
         opt!(multispace) ~
-        value: alt!(
+        value: alt_complete!(
             bool_ |
             char_ |
             integer |
@@ -70,7 +72,7 @@ named!(item<&[u8], Value, ParserError>,
         || value));
 
 named!(pair<&[u8], Value, ParserError>,
-    fix!(delimited!(
+    error!(ErrorKind::Custom(ParserError::InvalidPair), complete!(delimited!(
             fix!(tag!("(")),
             chain!(
                 a: item ~
@@ -80,7 +82,7 @@ named!(pair<&[u8], Value, ParserError>,
                 b: item ,
                 || { Value::new_pair(a,b) }
             ),
-            fix!(tag!(")")))));
+            fix!(tag!(")"))))));
 
 named!(list_inner<Vec<Value> >,
     many0!(item));
@@ -95,22 +97,54 @@ named!(list<&[u8], Value, ParserError>,
                 tag!("("),
                 list_inner,
                 tag!(")")),
-            |x| Value::new_list(x)))
+            |x: Vec<Value>| {
+                let mut iter = x.into_iter().rev();
+                let last = iter.next().unwrap(); // safe because list len must be >= 1
+                iter.fold(Value::new_pair(last, Value::empty_list()), |prev_pair, value| Value::new_pair(value, prev_pair))
+            }))
         ));
 
-pub fn parse(input: &[u8]) -> Value {
-    item(input).unwrap().1
+pub fn parse(input: &[u8]) -> Result<Value, String> {
+    use nom::Err as NomErr;
+    named!(complete_item<&[u8], Value, ParserError>, complete!(item));
+    match complete_item(input) {
+        IResult::Done(_, value) => Ok(value),
+        IResult::Incomplete(_) => unimplemented!(), // because of complete
+        IResult::Error(NomErr::Position(err, _)) => Err(create_error_string(err)),
+        IResult::Error(NomErr::NodePosition(err, _, _)) => Err(create_error_string(err)),
+        _ => unimplemented!(),
+    }
+}
+
+fn create_error_string(err: ErrorKind<ParserError>) -> String {
+    let msg = match err {
+        ErrorKind::Custom(x) => format!("{}", x),
+        x => format!("parser error {}", x.description()),
+    };
+
+    format!("error: {}", msg)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ParserError {
     MultipleChars, // more than 1 character between '', eg. 'ab'
     MissingChar,   // no char between '', eg. ''
+    InvalidPair,   // eg. (1 2 . 3) or (1 . 2 3)
+}
+
+impl fmt::Display for ParserError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ParserError::MultipleChars => write!(f, "more than one character between ''"), // more than 1 character between '', eg. 'ab'
+            ParserError::MissingChar => write!(f, "no character between ''"),   // no char between '', eg. ''
+            ParserError::InvalidPair => write!(f, "invalid pair"),   // eg. (1 2 . 3) or (1 . 2 3)
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{ParserError, bool_, char_, integer, ident, pair, list};
+    use super::{ParserError, bool_, char_, integer, ident, pair, list, item};
     use nom::{IResult, Err, ErrorKind};
     use super::super::value::Value;
 
@@ -126,12 +160,7 @@ mod test {
                         ErrorKind::Custom(kind),
                         pos,
                         ref boxed_err)
-                ) if (pos == error_pos && kind == $errorkind) => {
-                    match &**boxed_err {
-                        &Err::Position(_, pos) if pos == error_pos => true,
-                        x => { println!("{:?}", x); false },
-                    }
-                },
+                ) if (pos == error_pos && kind == $errorkind) => { true },
                 x => { println!("{:?}", x); false }
             });
         );
@@ -220,8 +249,10 @@ mod test {
         expect_ok!(pair, "(true . false)", Value::new_pair(t.clone(), f.clone()));
         expect_ok!(pair, "(true . (false . ()))", Value::new_pair(t, Value::new_pair(f.clone(), e.clone())));
 
-        expect_error!(pair, "(1 . 2 3)", 6);
-        expect_error!(pair, "(1 . 2 . 3)", 6);
-        expect_error!(pair, "(1 2 . 3)", 3);
+        expect_error!(pair, "(1 .)", 0, ParserError::InvalidPair);
+        expect_error!(pair, "(. 2)", 0, ParserError::InvalidPair);
+        expect_error!(pair, "(1 . 2 3)", 0, ParserError::InvalidPair);
+        expect_error!(pair, "(1 . 2 . 3)", 0, ParserError::InvalidPair);
+        expect_error!(pair, "(1 2 . 3)", 0, ParserError::InvalidPair);
     }
 }

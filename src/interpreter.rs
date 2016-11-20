@@ -30,31 +30,34 @@ impl Scope {
 
 pub struct Interpreter {
     starting_point: Option<Value>,
-    scopes: Vec<Scope>,
+    //scopes: Vec<Scope>,
 }
 
 impl Interpreter {
     pub fn new(value: Value) -> Self {
         Interpreter{
             starting_point: Some(value),
-            scopes: vec![],
+            //scopes: vec![],
         }
     }
 
     pub fn start(&mut self) -> Value {
-        self.init();
+        //self.init();
         let mut value = self.starting_point.take().unwrap();
         self.evaluate(&mut value)
     }
 
+    /*
     fn init(&mut self) {
         self.scopes.push(Scope::new());
         self.add_ident("+", Value::new_native_plus());
         self.add_ident("define", Value::new_native_define());
     }
+*/
 
     fn evaluate(&mut self, value: &Value) -> Value {
         match value.data() {
+            /*
             &ValueData::List(ref vec) => {
                 if vec.len() == 0 { panic!("Tried to evaluate empty list") }
                 let (first, rest) = vec.split_at(1);
@@ -63,53 +66,12 @@ impl Interpreter {
                 let rest = rest.iter();
                 self.call(&first, rest)
             }
-            &ValueData::Ident(ref ident) => self.lookup_ident(ident).clone(),
+            */
             _ => value.clone(),
         }
     }
 
-    fn call<'a, I>(&mut self, value: &Value, args: I) -> Value
-    where I: 'a + Iterator<Item=&'a Value>,
-    {
-        match value.data() {
-            &ValueData::NativePlus => {
-                let sum = args
-                .map(|value| self.evaluate(&value))
-                .fold(0, |acc, i|{
-                    match i.data() {
-                        &ValueData::Integer(x) => acc + x,
-                        x => panic!("Tried to sum {:?}", x),
-                    }
-                });
-                Value::new_integer(sum)
-            },
-            &ValueData::NativeDefine => {
-                println!("hi");
-                let (ident, expr) = {
-                    let mut args = args.map(|value| self.evaluate(&value));
-                    let ident = match args.next().map(|x| x.into_data()) {
-                        Some(ValueData::Ident(s)) => s,
-                        Some(value) => panic!("expected: (define <ident> <expr>), got {} as <ident>", value),
-                        None => panic!("expected: (define <ident> <expr>), missing <ident> and <expr>")
-                    };
-                    let expr = match args.next() {
-                        Some(value) => value,
-                        None => panic!("expected: (define <ident> <expr>), missing <expr>")
-                    };
-                    let v: Vec<Value> = args.collect();
-                    if v.len() != 0 {
-                        panic!("expected: (define <ident> <expr>), got too many arguments: {:?}", v)
-                    }
-                    (ident, expr)
-                };
-
-                self.add_ident(&ident, expr.clone());
-                expr
-            }
-            x => panic!("Tried to call {:?}", x),
-        }
-    }
-
+/*
     fn intern_ident(&self, ident: &str) -> u64 {
         let mut s = SipHasher::new();
         ident.hash(&mut s);
@@ -137,4 +99,5 @@ impl Interpreter {
         let id = self.intern_ident(ident);
         self.scopes.last_mut().unwrap().add_ident(id, value);
     }
+    */
 }
