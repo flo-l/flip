@@ -58,6 +58,81 @@ named!(integer<&[u8], Value, ParserError>,
             }
         })));
 
+// eats everything until a " char is encountered
+// recognizes escaped characters
+fn eat_string_content(input: &[u8]) -> IResult<&[u8], String, ParserError> {
+    fn save_str(input: &[u8], start: &mut usize, end: &mut usize, content: &mut String) {
+        if start >= end { return }
+        let utf8_str = match str::from_utf8(&input[*start..*end]) {
+            Ok(s) => s,
+            Err(x) => panic!("{:?}", x), // TODO: prettify this
+        };
+        content.push_str(utf8_str);
+        *start = *end;
+    }
+
+    if input.len() == 0 {
+        return IResult::Done(&input, String::new());
+    }
+
+    let mut end: usize = 0;
+    let mut start: usize = 0;
+    let mut content = String::new();
+    while end < input.len() {
+        println!("--------{}: {:?}", end, input[end] as char);
+        if input[end] == '"' as u8 {
+            break
+        }
+        println!("bla");
+        if input[end] == '\\' as u8 {
+            if (&input[end..]).len() <= 1 {
+                break;
+            }
+
+            if input[end+1..].starts_with("n".as_bytes()) {
+                save_str(input, &mut start, &mut end, &mut content);
+                content.push('\n');
+                start += 2;
+                end += 2;
+            } else if input[end+1..].starts_with("t".as_bytes()) {
+                save_str(input, &mut start, &mut end, &mut content);
+                content.push('\t');
+                start += 2;
+                end += 2;
+            } else if input[end+1..].starts_with("\"".as_bytes()) {
+                println!("save_str2({:?}, &mut {:?}, &mut {:?}, &mut {:?})", str::from_utf8(input), &mut start, &mut end, &mut content);
+                save_str(input, &mut start, &mut end, &mut content);
+                content.push('\"');
+                start += 2;
+                end += 2;
+            } else if input[end+1..].starts_with("\\".as_bytes()) {
+                save_str(input, &mut start, &mut end, &mut content);
+                content.push('\\');
+                start += 2;
+                end += 2;
+            } else {
+                end += 1;
+            }
+        } else {
+            end += 1;
+        }
+    }
+
+    println!("save_str({:?}, &mut {:?}, &mut {:?}, &mut {:?})", str::from_utf8(input), &mut start, &mut end, &mut content);
+    save_str(input, &mut start, &mut end, &mut content);
+    println!("{:?}", str::from_utf8(&input[end..]));
+
+    IResult::Done(&input[end..], content)
+}
+
+named!(string<&[u8], Value, ParserError>,
+    chain!(
+        fix!(tag!("\"")) ~
+        x: eat_string_content ~
+        fix!(tag!("\"")) ,
+        || { Value::new_string(x) }
+    ));
+
 named!(item<&[u8], Value, ParserError>,
     complete!(chain!(
         opt!(multispace) ~
@@ -65,6 +140,7 @@ named!(item<&[u8], Value, ParserError>,
             bool_ |
             char_ |
             integer |
+            string |
             ident |
             pair |
             list) ~
@@ -136,6 +212,7 @@ enum ParserError {
     MissingChar,   // no char between '', eg. ''
     InvalidPair,   // eg. (1 2 . 3) or (1 . 2 3)
     InvalidItem,   // eg. 1 2
+    NonUtf8String, // well..
 }
 
 impl fmt::Display for ParserError {
@@ -145,13 +222,14 @@ impl fmt::Display for ParserError {
             ParserError::MissingChar => write!(f, "no character between ''"),
             ParserError::InvalidPair => write!(f, "invalid pair"),
             ParserError::InvalidItem => write!(f, "invalid item"),
+            ParserError::NonUtf8String => write!(f, "string is no valid UTF8"),
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{ParserError, bool_, char_, integer, ident, pair, list, item};
+    use super::{ParserError, bool_, char_, integer, string, ident, pair, list, item, parse};
     use nom::{IResult, Err, ErrorKind};
     use super::super::value::Value;
 
@@ -263,9 +341,35 @@ mod test {
         expect_error!(pair, "(1 2 . 3)", 0, ParserError::InvalidPair);
     }
 
+    #[test]
+    fn string_() {
+        fn q(s: &str) -> String { format!("\"{}\"", s) }
+        fn uq(s: &str) -> &str { &s[1..s.len()-1] }
+
+        macro_rules! expect_str_ok {
+            ($s:expr, $e:expr) => ({
+                let s = q($s);
+                expect_ok!(string, s, Value::new_string($e));
+            });
+
+            ($s:expr) => (expect_str_ok!($s, $s));
+        }
+
+        expect_str_ok!("");
+        expect_str_ok!("abc");
+        expect_str_ok!("Hello, World!!");
+        expect_str_ok!("\n");
+        expect_str_ok!("\\n", "\n");
+        expect_str_ok!("\t");
+        expect_str_ok!("\\t", "\t");
+        expect_str_ok!("\\\\", "\\");
+        expect_str_ok!("Hi there: \\\" \\\\ \\n \\t", "Hi there: \" \\ \n \t");
+    }
+
     //TODO
-    fn item_() {
-        expect_error!(item, "1 1", 1, ParserError::InvalidItem);
+    #[test]
+    fn parse_() {
+        //expect_error!(parse, "1 1", 1, ParserError::InvalidItem);
 
     }
 }

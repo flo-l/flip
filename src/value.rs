@@ -16,6 +16,7 @@ impl Value {
     pub fn new_char(x: char) -> Self { Self::new_with(ValueData::Char(x)) }
     pub fn new_integer(x: i64) -> Self { Self::new_with(ValueData::Integer(x)) }
     pub fn new_ident<'a, T: 'a + Into<Cow<'a, str>>>(x: T) -> Self { Self::new_with(ValueData::Ident(x.into().into_owned())) }
+    pub fn new_string<'a, T: 'a + Into<Cow<'a, str>>>(x: T) -> Self { Self::new_with(ValueData::String(x.into().into_owned())) }
     pub fn new_pair(a: Value, b: Value) -> Self { Self::new_with(ValueData::Pair(a,b)) }
     pub fn empty_list() -> Self { Self::new_with(ValueData::EmptyList) }
     pub fn new_list<'a, T: 'a + Into<Cow<'a, [Value]>>>(x: T) -> Self { Self::new_with(ValueData::List(x.into().into_owned())) }
@@ -52,6 +53,7 @@ pub enum ValueData {
     Char(char),
     Integer(i64),
     Ident(String),
+    String(String),
     Pair(Value, Value),
     EmptyList,
     List(Vec<Value>),
@@ -66,6 +68,7 @@ impl fmt::Display for ValueData {
             &ValueData::Char(x) => write!(f, "{}", x),
             &ValueData::Integer(x) => write!(f, "{}", x),
             &ValueData::Ident(ref x) => write!(f, "{}", x),
+            &ValueData::String(ref x) => write!(f, "\"{}\"", x),
             &ValueData::Pair(ref a, ref b) if b.is_pair() => {
                 let mut current = b;
                 let mut res = write!(f, "({}", a);
