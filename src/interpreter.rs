@@ -1,103 +1,60 @@
-use super::value::{Value, ValueData};
-use std::collections::BTreeMap;
-use std::hash::{Hash, Hasher};
-use siphasher::sip::SipHasher24 as SipHasher;
-
-#[derive(Debug)]
-struct Scope {
-    idents: BTreeMap<u64, Value>,
-}
-
-impl Scope {
-    fn new() -> Self{
-        Scope {
-            idents: BTreeMap::new()
-        }
-    }
-
-    fn lookup_ident(&self, id: u64) -> Option<Value> {
-        self.idents.get(&id).cloned()
-    }
-
-    fn add_ident(&mut self, id: u64, value: Value) {
-        self.idents.insert(id, value);
-    }
-
-    fn idents(&self) -> &BTreeMap<u64, Value> {
-        &self.idents
-    }
-}
+use super::value::{Value, ValueData, ListIter};
+use super::scope::Scope;
+use super::native;
 
 pub struct Interpreter {
-    starting_point: Option<Value>,
-    //scopes: Vec<Scope>,
+    pub current_scope: Scope,
 }
 
 impl Interpreter {
-    pub fn new(value: Value) -> Self {
-        Interpreter{
-            starting_point: Some(value),
-            //scopes: vec![],
-        }
+    pub fn new() -> Self {
+        let mut interpreter = Interpreter {
+            current_scope: Scope::new()
+        };
+        interpreter.init();
+        interpreter
     }
 
-    pub fn start(&mut self) -> Value {
-        //self.init();
-        let mut value = self.starting_point.take().unwrap();
-        self.evaluate(&mut value)
-    }
-
-    /*
     fn init(&mut self) {
-        self.scopes.push(Scope::new());
-        self.add_ident("+", Value::new_native_plus());
-        self.add_ident("define", Value::new_native_define());
-    }
-*/
-
-    fn evaluate(&mut self, value: &Value) -> Value {
-        match value.data() {
-            /*
-            &ValueData::List(ref vec) => {
-                if vec.len() == 0 { panic!("Tried to evaluate empty list") }
-                let (first, rest) = vec.split_at(1);
-
-                let first = self.evaluate(&first[0]);
-                let rest = rest.iter();
-                self.call(&first, rest)
-            }
-            */
-            _ => value.clone(),
-        }
+        self.current_scope.add_ident("define", Value::new_native_proc(native::define));
+        self.current_scope.add_ident("set!", Value::new_native_proc(native::set));
     }
 
 /*
-    fn intern_ident(&self, ident: &str) -> u64 {
-        let mut s = SipHasher::new();
-        ident.hash(&mut s);
-        s.finish()
-    }
+    pub fn lookup_ident(ident: &str) -> Value {
+        if let Some(val) = self.scopes.last().lookup_ident(ident) {
+            val
+        } else {
+            println!("Searched Ident: {:?}", scope::intern_ident(ident));
+            println!("Known Idents: ");
+            for x in &self.scopes {
+                for (hash, value) in &x.idents {
+                    println!("({:?}) => {:?}", hash, value);
+                }
+            }
+            panic!("Ident: {:?} not found.", ident);
+        }
+    }*/
 
-    fn lookup_ident(&self, ident: &str) -> Value {
-        let id = self.intern_ident(ident);
-        for scope in self.scopes.iter().rev() {
-            if let Some(value) = scope.lookup_ident(id) {
-                return value.clone();
+    pub fn evaluate(&mut self, value: &Value) -> Value {
+        if value.is_list() {
+            let mut list: Vec<Value> = ListIter::new(value).cloned().collect();
+            let (func, mut args) = list.split_at_mut(1);
+            let func = if func.len() == 1 { self.evaluate(&func[0]) } else { panic!("tried to evaluate ()") };
+
+            if let Some(f) = func.get_fn_ptr() {
+                f(self, &mut args)
+            } else {
+                panic!("tried to call {}, which is not possible", func)
+            }
+        } else {
+            match value.data() {
+                &ValueData::Ident(ref s) => {
+                    self.current_scope.lookup_ident(s)
+                    .unwrap_or_else(|| panic!("undefined ident: {}", s))
+                },
+                _ => value.clone()
             }
         }
-        println!("Searched Ident: {:?}", id);
-        println!("Known Idents: ");
-        for x in &self.scopes {
-            for (hash, value) in &x.idents {
-                println!("({:?}) => {:?}", hash, value);
-            }
-        }
-        panic!("Ident: {:?} not found.", ident);
     }
-
-    fn add_ident(&mut self, ident: &str, value: Value) {
-        let id = self.intern_ident(ident);
-        self.scopes.last_mut().unwrap().add_ident(id, value);
-    }
-    */
 }

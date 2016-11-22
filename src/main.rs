@@ -9,13 +9,17 @@ mod parser;
 mod value;
 mod interpreter;
 mod repl;
+mod scope;
+mod native;
 
 use std::io::Read;
 
 fn main() {
     if let Some(file) = cli::get_args() {
         let input: Vec<u8> = file.bytes().filter_map(Result::ok).collect();
-        println!("{:?}", repl::parse_and_compile(&input));
+        let parsed = parser::parse(&input).unwrap();
+        let mut interpreter = interpreter::Interpreter::new();
+        println!("{:?}", interpreter.evaluate(&parsed));
     } else {
         repl::Repl::start();
     }

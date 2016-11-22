@@ -13,14 +13,17 @@ impl Repl {
         rl.add_history_entry(quit);
         rl.set_completer(Some(ParensCloser{}));
 
+        let mut interpreter = interpreter::Interpreter::new();
+
         loop {
             let line = rl.readline(">> ");
             let line = if line.is_err() { return } else { line.unwrap() };
             if line == quit { return }
-            let result = parse_and_compile(line.as_bytes());
             rl.add_history_entry(&line);
-            match result {
-                Ok(value) => println!("=> {}", value),
+
+            let parsed = parser::parse(line.as_bytes());
+            match parsed {
+                Ok(value) => println!("=> {}", interpreter.evaluate(&value)),
                 Err(err)  => println!("{}", err),
             }
         }
@@ -41,10 +44,3 @@ impl rustyline::completion::Completer for ParensCloser {
         let len = line.len();
         line.replace(len, len, elected);
     }}
-
-pub fn parse_and_compile(input: &[u8]) -> Result<value::Value, String>
-{
-    let parsed = parser::parse(input)?;
-    let mut interpreter = interpreter::Interpreter::new(parsed);
-    Ok(interpreter.start())
-}

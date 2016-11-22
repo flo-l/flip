@@ -136,6 +136,7 @@ named!(string<&[u8], Value, ParserError>,
 named!(item<&[u8], Value, ParserError>,
     complete!(chain!(
         opt!(multispace) ~
+        quoted: opt!(tag!("'")) ~
         value: alt_complete!(
             bool_ |
             char_ |
@@ -145,7 +146,9 @@ named!(item<&[u8], Value, ParserError>,
             pair |
             list) ~
         peek!(end_of_item),
-        || value)));
+        || if quoted.is_some() {
+            Value::new_pair(Value::new_ident("quote"), Value::new_pair(value, Value::empty_list()))
+        } else { value })));
 
 named!(pair<&[u8], Value, ParserError>,
     error!(ErrorKind::Custom(ParserError::InvalidPair), complete!(delimited!(

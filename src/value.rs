@@ -1,6 +1,10 @@
 use std::fmt;
 use std::rc::Rc;
 use std::borrow::Cow;
+use std::mem;
+use super::scope::Scope;
+use super::interpreter::Interpreter;
+use super::native;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -19,16 +23,16 @@ impl Value {
     pub fn new_string<'a, T: 'a + Into<Cow<'a, str>>>(x: T) -> Self { Self::new_with(ValueData::String(x.into().into_owned())) }
     pub fn new_pair(a: Value, b: Value) -> Self { Self::new_with(ValueData::Pair(a,b)) }
     pub fn empty_list() -> Self { Self::new_with(ValueData::EmptyList) }
-    pub fn new_list<'a, T: 'a + Into<Cow<'a, [Value]>>>(x: T) -> Self { Self::new_with(ValueData::List(x.into().into_owned())) }
-    pub fn new_native_plus() -> Self { Self::new_with(ValueData::NativePlus) }
-    pub fn new_native_define() -> Self { Self::new_with(ValueData::NativeDefine) }
+    pub fn new_native_proc(f: fn(&mut Interpreter, &mut [Value]) -> Value) -> Self {
+        let raw: *const () = f as *const ();
+        Self::new_with(ValueData::NativeProc(raw))
+    }
 
     pub fn data(&self) -> &ValueData { &*self.val_ptr }
-    // tries to move out data, clones if rc count is > 1
-    pub fn into_data(self) -> ValueData {
-        match Rc::try_unwrap(self.val_ptr) {
-            Ok(x) => x,
-            Err(rc) => (*rc).clone(),
+    pub fn get_fn_ptr(&self) -> Option<fn(&mut Interpreter, &mut [Value]) -> Value> {
+        match self.data() {
+            &ValueData::NativeProc(f) => Some(unsafe { mem::transmute(f) }),
+            _ => None,
         }
     }
 
@@ -36,14 +40,57 @@ impl Value {
         if let &ValueData::Pair(_, _) = self.data() { true } else { false }
     }
 
+    pub fn is_list(&self) -> bool {
+        match self.data() {
+            &ValueData::Pair(_, ref b) => b.is_pair() || b.is_empty_list(),
+            &ValueData::EmptyList => true,
+            _ => false
+        }
+    }
+
     fn is_empty_list(&self) -> bool {
         if let &ValueData::EmptyList = self.data() { true } else { false }
+    }
+
+    pub fn get_ident(&self) -> Option<&str> {
+        match self.data() {
+            &ValueData::Ident(ref s) => Some(&*s),
+            _ => None,
+        }
     }
 }
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.val_ptr.fmt(f)
+    }
+}
+
+pub struct ListIter<'a> {
+    current: &'a Value,
+}
+
+impl<'a> ListIter<'a> {
+    pub fn new(val: &'a Value) -> Self {
+        ListIter { current: val }
+    }
+}
+
+impl<'a> Iterator for ListIter<'a> {
+    type Item = &'a Value;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.current.data() {
+            &ValueData::Pair(ref a, ref b) if b.is_pair() || b.is_empty_list() => {
+                self.current = b;
+                Some(a)
+            },
+            &ValueData::Pair(ref a, _) => {
+                let ret = self.current;
+                self.current = a; // dummy
+                Some(ret)
+            }
+            _ => None,
+        }
     }
 }
 
@@ -56,9 +103,7 @@ pub enum ValueData {
     String(String),
     Pair(Value, Value),
     EmptyList,
-    List(Vec<Value>),
-    NativePlus,
-    NativeDefine,
+    NativeProc(*const ()),
 }
 
 impl fmt::Display for ValueData {
@@ -69,41 +114,17 @@ impl fmt::Display for ValueData {
             &ValueData::Integer(x) => write!(f, "{}", x),
             &ValueData::Ident(ref x) => write!(f, "{}", x),
             &ValueData::String(ref x) => write!(f, "\"{}\"", x),
-            &ValueData::Pair(ref a, ref b) if b.is_pair() => {
-                let mut current = b;
+            &ValueData::Pair(ref a, ref b) if b.is_pair() || b.is_empty_list() => {
+                let iter = ListIter::new(b);
                 let mut res = write!(f, "({}", a);
-
-                loop {
-                    if let &ValueData::EmptyList = current.data() {
-                        res = res.and(write!(f, ")"));
-                        return res;
-                    }
-
-                    if let &ValueData::Pair(ref x, ref y) = current.data() {
-                        if y.is_pair() || y.is_empty_list() {
-                            res = res.and(write!(f, " {}", x));
-                            current = y;
-                            continue;
-                        } else {
-                            res = res.and(write!(f, " {})", current));
-                            return res;
-                        }
-                    }
+                for x in iter {
+                    res = res.and(write!(f, " {}", x));
                 }
+                res.and(write!(f, ")"))
             },
-            &ValueData::Pair(ref a, ref b) if b.is_empty_list() => write!(f, "({})", a),
             &ValueData::Pair(ref a, ref b) => write!(f, "({} . {})", a, b),
             &ValueData::EmptyList => write!(f, "()"),
-            &ValueData::List(ref vec) => {
-                let last = vec.len() - 1;
-                let mut res = write!(f, "(");
-                for x in &vec[..last] {
-                    res = res.and(write!(f, "{} ", x));
-                }
-                res.and(write!(f, "{})", vec[last]))
-            },
-            &ValueData::NativePlus => write!(f, "[NATIVE_PROC]+"),
-            &ValueData::NativeDefine => write!(f, "[NATIVE_PROC]define"),
+            &ValueData::NativeProc(x) => write!(f, "[NATIVE_PROC: {:?}]", x),
         }
     }
 }
@@ -122,6 +143,7 @@ mod test {
         let c = Value::new_pair(v(2), b.clone());
         let d = Value::new_pair(v(1), c.clone());
 
+        assert_eq!(format!("{}", empty), "()");
         assert_eq!(format!("{}", a), "(4)");
         assert_eq!(format!("{}", b), "(3 4)");
         assert_eq!(format!("{}", c), "(2 3 4)");
