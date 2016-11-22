@@ -2,9 +2,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::borrow::Cow;
 use std::mem;
-use super::scope::Scope;
 use super::interpreter::Interpreter;
-use super::native;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -131,7 +129,7 @@ impl fmt::Display for ValueData {
 
 #[cfg(test)]
 mod test {
-    use super::{Value, ValueData};
+    use super::Value;
 
     #[test]
     fn pair_format() {

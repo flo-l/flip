@@ -1,4 +1,3 @@
-use super::value;
 use super::interpreter;
 use super::parser;
 use rustyline::{self, line_buffer};

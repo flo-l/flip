@@ -1,4 +1,4 @@
-use nom::{digit, multispace, eof, ErrorKind, IResult};
+use nom::{self, digit, multispace, eof, ErrorKind, IResult};
 use std::str;
 use std::fmt;
 use super::value::Value;
@@ -61,14 +61,24 @@ named!(integer<&[u8], Value, ParserError>,
 // eats everything until a " char is encountered
 // recognizes escaped characters
 fn eat_string_content(input: &[u8]) -> IResult<&[u8], String, ParserError> {
-    fn save_str(input: &[u8], start: &mut usize, end: &mut usize, content: &mut String) {
-        if start >= end { return }
+    macro_rules! itry {
+        ($e:expr) => ({
+            match $e {
+                Ok(_) => (),
+                Err(x) => return IResult::Error(x),
+            }
+        })
+    }
+
+    fn save_str<'a>(input: &'a[u8], start: &mut usize, end: &mut usize, content: &mut String) -> Result<(), nom::Err<&'a [u8], ParserError>> {
+        if start >= end { return Ok(())}
         let utf8_str = match str::from_utf8(&input[*start..*end]) {
             Ok(s) => s,
-            Err(x) => panic!("{:?}", x), // TODO: prettify this
+            Err(x) => return Err(nom::Err::Position(ErrorKind::Custom(ParserError::NonUtf8String), &input[0..x.valid_up_to()])),
         };
         content.push_str(utf8_str);
         *start = *end;
+        return Ok(())
     }
 
     if input.len() == 0 {
@@ -90,23 +100,23 @@ fn eat_string_content(input: &[u8]) -> IResult<&[u8], String, ParserError> {
             }
 
             if input[end+1..].starts_with("n".as_bytes()) {
-                save_str(input, &mut start, &mut end, &mut content);
+                itry!(save_str(input, &mut start, &mut end, &mut content));
                 content.push('\n');
                 start += 2;
                 end += 2;
             } else if input[end+1..].starts_with("t".as_bytes()) {
-                save_str(input, &mut start, &mut end, &mut content);
+                itry!(save_str(input, &mut start, &mut end, &mut content));
                 content.push('\t');
                 start += 2;
                 end += 2;
             } else if input[end+1..].starts_with("\"".as_bytes()) {
                 println!("save_str2({:?}, &mut {:?}, &mut {:?}, &mut {:?})", str::from_utf8(input), &mut start, &mut end, &mut content);
-                save_str(input, &mut start, &mut end, &mut content);
+                itry!(save_str(input, &mut start, &mut end, &mut content));
                 content.push('\"');
                 start += 2;
                 end += 2;
             } else if input[end+1..].starts_with("\\".as_bytes()) {
-                save_str(input, &mut start, &mut end, &mut content);
+                itry!(save_str(input, &mut start, &mut end, &mut content));
                 content.push('\\');
                 start += 2;
                 end += 2;
@@ -118,10 +128,7 @@ fn eat_string_content(input: &[u8]) -> IResult<&[u8], String, ParserError> {
         }
     }
 
-    println!("save_str({:?}, &mut {:?}, &mut {:?}, &mut {:?})", str::from_utf8(input), &mut start, &mut end, &mut content);
-    save_str(input, &mut start, &mut end, &mut content);
-    println!("{:?}", str::from_utf8(&input[end..]));
-
+    itry!(save_str(input, &mut start, &mut end, &mut content));
     IResult::Done(&input[end..], content)
 }
 
@@ -247,7 +254,7 @@ mod test {
                     Err::NodePosition(
                         ErrorKind::Custom(kind),
                         pos,
-                        ref boxed_err)
+                        _)
                 ) if (pos == error_pos && kind == $errorkind) => { true },
                 x => { println!("{:?}", x); false }
             });
@@ -347,7 +354,6 @@ mod test {
     #[test]
     fn string_() {
         fn q(s: &str) -> String { format!("\"{}\"", s) }
-        fn uq(s: &str) -> &str { &s[1..s.len()-1] }
 
         macro_rules! expect_str_ok {
             ($s:expr, $e:expr) => ({
@@ -367,6 +373,8 @@ mod test {
         expect_str_ok!("\\t", "\t");
         expect_str_ok!("\\\\", "\\");
         expect_str_ok!("Hi there: \\\" \\\\ \\n \\t", "Hi there: \" \\ \n \t");
+
+        //TODO add failing examples, es. UTF8 related
     }
 
     //TODO
