@@ -16,9 +16,20 @@ impl Interpreter {
     }
 
     fn init(&mut self) {
+        self.current_scope.add_ident("quote", Value::new_native_proc(native::quote));
         self.current_scope.add_ident("define", Value::new_native_proc(native::define));
         self.current_scope.add_ident("set!", Value::new_native_proc(native::set));
         self.current_scope.add_ident("if", Value::new_native_proc(native::if_));
+
+        self.current_scope.add_ident("null?", Value::new_native_proc(native::null_));
+        self.current_scope.add_ident("boolean?", Value::new_native_proc(native::boolean_));
+        self.current_scope.add_ident("symbol?", Value::new_native_proc(native::symbol_));
+        self.current_scope.add_ident("integer?", Value::new_native_proc(native::integer_));
+        self.current_scope.add_ident("char?", Value::new_native_proc(native::char_));
+        self.current_scope.add_ident("string?", Value::new_native_proc(native::string_));
+        self.current_scope.add_ident("pair?", Value::new_native_proc(native::pair_));
+        self.current_scope.add_ident("procedure?", Value::new_native_proc(native::procedure_));
+
     }
 
 /*

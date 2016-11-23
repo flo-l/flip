@@ -1,6 +1,13 @@
 use super::value::Value;
 use super::interpreter::Interpreter;
 
+pub fn quote(_: &mut Interpreter, args: &mut [Value]) -> Value {
+    if args.len() != 1 {
+        panic!("quote accepts exactly 1 argument");
+    }
+    args[0].clone()
+}
+
 pub fn define(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     if args.len() != 2 {
         panic!("define accepts exactly 2 arguments");
@@ -50,3 +57,36 @@ pub fn if_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         panic!("first arg of if has to evaluate to bool, got: {}", condition);
     }
 }
+
+macro_rules! eval_args {
+    (fn $func:ident($args:ident : $arg_ty:ty) -> $ret_ty:ty $blk:block) =>
+    (
+        pub fn $func(interpreter: &mut Interpreter, args: $arg_ty) -> $ret_ty {
+            fn inner($args: $arg_ty) -> $ret_ty $blk;
+            for x in args.iter_mut() {
+                *x = interpreter.evaluate(x);
+            }
+            inner(args)
+        }
+    )
+}
+
+// Type checking
+macro_rules! type_checker {
+    ($func:ident, $lisp_name:expr, $checking_fn:ident) =>
+    (eval_args!(fn $func(args: &mut [Value]) -> Value {
+        if args.len() != 1 {
+            panic!("{} accepts exactly 1 argument", $lisp_name);
+        }
+        Value::new_bool(args[0].$checking_fn().is_some())
+    }););
+}
+
+type_checker!(null_, "null?", get_empty_list);
+type_checker!(boolean_, "boolean?", get_bool);
+type_checker!(symbol_, "symbol?", get_ident);
+type_checker!(integer_, "integer?", get_integer);
+type_checker!(char_, "char?", get_char);
+type_checker!(string_, "string?", get_string);
+type_checker!(pair_, "pair?", get_pair);
+type_checker!(procedure_, "procedure?", get_fn_ptr);

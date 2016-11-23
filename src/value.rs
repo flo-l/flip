@@ -27,12 +27,6 @@ impl Value {
     }
 
     pub fn data(&self) -> &ValueData { &*self.val_ptr }
-    pub fn get_fn_ptr(&self) -> Option<fn(&mut Interpreter, &mut [Value]) -> Value> {
-        match self.data() {
-            &ValueData::NativeProc(f) => Some(unsafe { mem::transmute(f) }),
-            _ => None,
-        }
-    }
 
     fn is_pair(&self) -> bool {
         if let &ValueData::Pair(_, _) = self.data() { true } else { false }
@@ -46,8 +40,12 @@ impl Value {
         }
     }
 
-    fn is_empty_list(&self) -> bool {
-        if let &ValueData::EmptyList = self.data() { true } else { false }
+    pub fn is_empty_list(&self) -> bool {
+        self.get_empty_list().is_some()
+    }
+
+    pub fn get_empty_list(&self) -> Option<()> {
+        if let &ValueData::EmptyList = self.data() { Some(()) } else { None }
     }
 
     pub fn get_ident(&self) -> Option<&str> {
@@ -60,6 +58,41 @@ impl Value {
     pub fn get_bool(&self) -> Option<bool> {
         match self.data() {
             &ValueData::Bool(b) => Some(b),
+            _ => None,
+        }
+    }
+
+    pub fn get_integer(&self) -> Option<i64> {
+        match self.data() {
+            &ValueData::Integer(i) => Some(i),
+            _ => None,
+        }
+    }
+
+    pub fn get_char(&self) -> Option<char> {
+        match self.data() {
+            &ValueData::Char(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    pub fn get_string(&self) -> Option<&str> {
+        match self.data() {
+            &ValueData::String(ref s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn get_pair(&self) -> Option<(&Value, &Value)> {
+        match self.data() {
+            &ValueData::Pair(ref a, ref b) => Some((a, b)),
+            _ => None,
+        }
+    }
+
+    pub fn get_fn_ptr(&self) -> Option<fn(&mut Interpreter, &mut [Value]) -> Value> {
+        match self.data() {
+            &ValueData::NativeProc(f) => Some(unsafe { mem::transmute(f) }),
             _ => None,
         }
     }

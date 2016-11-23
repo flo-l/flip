@@ -89,11 +89,9 @@ fn eat_string_content(input: &[u8]) -> IResult<&[u8], String, ParserError> {
     let mut start: usize = 0;
     let mut content = String::new();
     while end < input.len() {
-        println!("--------{}: {:?}", end, input[end] as char);
         if input[end] == '"' as u8 {
             break
         }
-        println!("bla");
         if input[end] == '\\' as u8 {
             if (&input[end..]).len() <= 1 {
                 break;
@@ -110,7 +108,6 @@ fn eat_string_content(input: &[u8]) -> IResult<&[u8], String, ParserError> {
                 start += 2;
                 end += 2;
             } else if input[end+1..].starts_with("\"".as_bytes()) {
-                println!("save_str2({:?}, &mut {:?}, &mut {:?}, &mut {:?})", str::from_utf8(input), &mut start, &mut end, &mut content);
                 itry!(save_str(input, &mut start, &mut end, &mut content));
                 content.push('\"');
                 start += 2;
