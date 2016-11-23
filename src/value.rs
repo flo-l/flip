@@ -56,6 +56,13 @@ impl Value {
             _ => None,
         }
     }
+
+    pub fn get_bool(&self) -> Option<bool> {
+        match self.data() {
+            &ValueData::Bool(b) => Some(b),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for Value {

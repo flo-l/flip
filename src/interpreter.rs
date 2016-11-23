@@ -18,6 +18,7 @@ impl Interpreter {
     fn init(&mut self) {
         self.current_scope.add_ident("define", Value::new_native_proc(native::define));
         self.current_scope.add_ident("set!", Value::new_native_proc(native::set));
+        self.current_scope.add_ident("if", Value::new_native_proc(native::if_));
     }
 
 /*
