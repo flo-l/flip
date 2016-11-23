@@ -1,3 +1,4 @@
+use std::ops::{Add, Sub, Mul, Div, Rem};
 use super::value::Value;
 use super::interpreter::Interpreter;
 
@@ -108,3 +109,57 @@ type_conversion!(number_string, "number->string", from_number_to_string);
 type_conversion!(string_number, "string->number", from_string_to_number);
 type_conversion!(symbol_string, "symbol->string", from_symbol_to_string);
 type_conversion!(string_symbol, "string->symbol", from_string_to_symbol);
+
+// Arithmetic operators
+macro_rules! arithmetic_operator {
+    ($func:ident, $operator:path, $default:expr) =>
+    (eval_args!(fn $func(args: &mut [Value]) -> Value {
+
+        let mut res = if args.len() < 2 {
+            $default as i64
+        } else {
+            args[0].get_integer().unwrap_or_else(|| panic!("expected integer, got: {}", &args[0]))
+        };
+        for x in args[1..].iter() {
+            if let Some(i) = x.get_integer() {
+                res = $operator(res, i);
+            } else {
+                panic!("expected intege, got: {}", x);
+            }
+        }
+        Value::new_integer(res)
+    }););
+}
+
+arithmetic_operator!(plus, Add::add, 0);
+arithmetic_operator!(minus, Sub::sub, 0);
+arithmetic_operator!(multiply, Mul::mul, 1);
+arithmetic_operator!(quotient, Div::div, 1);
+arithmetic_operator!(remainder, Rem::rem, 1);
+
+// Comparison Operators
+macro_rules! comparison_operator {
+    ($func:ident, $lisp_name:expr, $operator:path) =>
+    (eval_args!(fn $func(args: &mut [Value]) -> Value {
+        if args.len() < 1 {
+            panic!("{} accepts 1 or more arguments", $lisp_name);
+        }
+
+        let mut res = true;
+        let compared_element = &args[0].get_integer()
+        .unwrap_or_else(|| panic!("expected integer, found {}", &args[0]));
+
+        for x in &args[1..] {
+            let num = x.get_integer()
+            .unwrap_or_else(|| panic!("expected integer, found {}", &args[0]));
+            res = res && $operator(compared_element, &num)
+        }
+        Value::new_bool(res)
+    }););
+}
+
+comparison_operator!(eq, "=", PartialEq::eq);
+comparison_operator!(lt, "<", PartialOrd::lt);
+comparison_operator!(le, "<=", PartialOrd::le);
+comparison_operator!(gt, ">", PartialOrd::gt);
+comparison_operator!(ge, ">=", PartialOrd::ge);

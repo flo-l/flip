@@ -36,6 +36,19 @@ impl Interpreter {
         self.current_scope.add_ident("string->number", Value::new_native_proc(native::string_number));
         self.current_scope.add_ident("symbol->string", Value::new_native_proc(native::symbol_string));
         self.current_scope.add_ident("string->symbol", Value::new_native_proc(native::string_symbol));
+
+        self.current_scope.add_ident("+", Value::new_native_proc(native::plus));
+        self.current_scope.add_ident("-", Value::new_native_proc(native::minus));
+        self.current_scope.add_ident("*", Value::new_native_proc(native::multiply));
+        self.current_scope.add_ident("quotient", Value::new_native_proc(native::quotient));
+        self.current_scope.add_ident("remainder", Value::new_native_proc(native::remainder));
+
+        self.current_scope.add_ident("=", Value::new_native_proc(native::eq));
+        self.current_scope.add_ident(">", Value::new_native_proc(native::gt));
+        self.current_scope.add_ident(">=", Value::new_native_proc(native::ge));
+        self.current_scope.add_ident("<", Value::new_native_proc(native::lt));
+        self.current_scope.add_ident("<=", Value::new_native_proc(native::le));
+
     }
 
 /*
