@@ -30,6 +30,12 @@ impl Interpreter {
         self.current_scope.add_ident("pair?", Value::new_native_proc(native::pair_));
         self.current_scope.add_ident("procedure?", Value::new_native_proc(native::procedure_));
 
+        self.current_scope.add_ident("char->integer", Value::new_native_proc(native::char_integer));
+        self.current_scope.add_ident("integer->char", Value::new_native_proc(native::integer_char));
+        self.current_scope.add_ident("number->string", Value::new_native_proc(native::number_string));
+        self.current_scope.add_ident("string->number", Value::new_native_proc(native::string_number));
+        self.current_scope.add_ident("symbol->string", Value::new_native_proc(native::symbol_string));
+        self.current_scope.add_ident("string->symbol", Value::new_native_proc(native::string_symbol));
     }
 
 /*

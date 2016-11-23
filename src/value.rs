@@ -2,11 +2,21 @@ use std::fmt;
 use std::rc::Rc;
 use std::borrow::Cow;
 use std::mem;
+use std::char;
 use super::interpreter::Interpreter;
+use super::parser;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
     val_ptr: Rc<ValueData>
+}
+
+macro_rules! check_type {
+    ($unwrap_fn:path, $e:expr, $type_name:expr) =>
+    ({
+        let expected = $unwrap_fn($e);
+        expected.unwrap_or_else(|| panic!("expected {}, got {:?}", $type_name, $e))
+    });
 }
 
 impl Value {
@@ -95,6 +105,46 @@ impl Value {
             &ValueData::NativeProc(f) => Some(unsafe { mem::transmute(f) }),
             _ => None,
         }
+    }
+
+    pub fn from_char_to_integer(a: &Value) -> Value {
+        let c = check_type!(Value::get_char, a, "char");
+        Value::new_integer(c as i64)
+    }
+
+    pub fn from_integer_to_char(a: &Value) -> Value {
+        let i = check_type!(Value::get_integer, a, "integer");
+        let c = char::from_u32(i as u32);
+        if i > char::MAX as i64 || c.is_none() {
+            panic!("{} is no valid char", i);
+        } else {
+            Value::new_char(c.unwrap())
+        }
+    }
+
+    pub fn from_number_to_string(a: &Value) -> Value {
+        let i = check_type!(Value::get_integer, a, "integer");
+        Value::new_string(format!("{}", i))
+    }
+
+    pub fn from_string_to_number(a: &Value) -> Value {
+        let s = check_type!(Value::get_string, a, "string");
+        let number = parser::integer(s.as_bytes());
+        if number.is_done() {
+            number.unwrap().1
+        } else {
+            panic!("{} is no valid integer", s)
+        }
+    }
+
+    pub fn from_symbol_to_string(a: &Value) -> Value {
+        let s = check_type!(Value::get_ident, a, "symbol");
+        Value::new_string(s)
+    }
+
+    pub fn from_string_to_symbol(a: &Value) -> Value {
+        let s = check_type!(Value::get_string, a, "string");
+        Value::new_ident(s)
     }
 }
 

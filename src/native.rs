@@ -90,3 +90,21 @@ type_checker!(char_, "char?", get_char);
 type_checker!(string_, "string?", get_string);
 type_checker!(pair_, "pair?", get_pair);
 type_checker!(procedure_, "procedure?", get_fn_ptr);
+
+// Type conversions
+macro_rules! type_conversion {
+    ($func:ident, $lisp_name:expr, $conversion_fn:ident) =>
+    (eval_args!(fn $func(args: &mut [Value]) -> Value {
+        if args.len() != 1 {
+            panic!("{} accepts exactly 1 argument", $lisp_name);
+        }
+        Value::$conversion_fn(&args[0])
+    }););
+}
+
+type_conversion!(char_integer, "char->integer", from_char_to_integer);
+type_conversion!(integer_char, "integer->char", from_integer_to_char);
+type_conversion!(number_string, "number->string", from_number_to_string);
+type_conversion!(string_number, "string->number", from_string_to_number);
+type_conversion!(symbol_string, "symbol->string", from_symbol_to_string);
+type_conversion!(string_symbol, "string->symbol", from_string_to_symbol);

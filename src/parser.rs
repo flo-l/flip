@@ -8,7 +8,7 @@ static UTF8_ERROR: &'static str = "File is no valid UTF8!";
 macro_rules! fix {
     ($i:expr, $it:ident) => (fix_error!($i, ParserError, $it));
     ($i:expr, $submac:ident!( $($args:tt)* )) => (
-      fix_error!($i, ParserError, $submac!($($args)*))
+      fix_error!($i, ParserError, complete!($submac!($($args)*)))
     );
 }
 
@@ -19,11 +19,8 @@ named!(bool_<&[u8], Value, ParserError>, fix!(map!(
     |x|{ Value::new_bool(x == b"true") })));
 
 named!(char_<&[u8], Value, ParserError>, fix!(chain!(
-    tag!("'") ~
-    error!(ErrorKind::Custom(ParserError::MissingChar), not!(tag!("'"))) ~
-    c: take!(1) ~
-    error!(ErrorKind::Custom(ParserError::MultipleChars),
-        fix!(tag!("'"))) ,
+    tag!("#\\") ~
+    c: take!(1) ,
     ||{ Value::new_char(c[0] as char) })));
 
 
@@ -45,7 +42,7 @@ named!(ident<&[u8], Value, ParserError>, fix!(chain!(
     x: take_while1!(is_valid_in_ident),
     || Value::new_ident((str::from_utf8(x).unwrap())))));
 
-named!(integer<&[u8], Value, ParserError>,
+named!(pub integer<&[u8], Value, ParserError>,
     fix!(chain!(
         s: opt!(char!('-')) ~
         x: digit ,
@@ -214,7 +211,7 @@ fn create_error_string(err: ErrorKind<ParserError>) -> String {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum ParserError {
+pub enum ParserError {
     MultipleChars, // more than 1 character between '', eg. 'ab'
     MissingChar,   // no char between '', eg. ''
     InvalidPair,   // eg. (1 2 . 3) or (1 . 2 3)
@@ -295,11 +292,10 @@ mod test {
         use std::u8;
         for x in 0..127 {
             if x == '\'' as u8 { continue } // skip ''', which is invalid (tested below)
-            let input = String::from_utf8(vec!['\'' as u8, x, '\'' as u8]).unwrap();
+            let input = String::from_utf8(vec!['#' as u8, '\\' as u8, x]).unwrap();
             expect_ok!(char_, input, Value::new_char(x as char));
         }
-        expect_error!(char_, "'ab'", 2, ParserError::MultipleChars);
-        expect_error!(char_, "''", 1, ParserError::MissingChar);
+        expect_error!(char_, "#\\", 0);
     }
 
     #[test]
