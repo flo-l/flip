@@ -36,7 +36,12 @@ impl Value {
         Self::new_with(ValueData::NativeProc(raw))
     }
 
-    pub fn data(&self) -> &ValueData { &*self.val_ptr }
+    fn data(&self) -> &ValueData {
+        &*self.val_ptr
+    }
+    fn data_mut(&mut self) -> &mut ValueData {
+        Rc::get_mut(&mut self.val_ptr).unwrap()
+    }
 
     fn is_pair(&self) -> bool {
         if let &ValueData::Pair(_, _) = self.data() { true } else { false }
@@ -100,6 +105,13 @@ impl Value {
         }
     }
 
+    pub fn get_pair_mut(&mut self) -> Option<(&mut Value, &mut Value)> {
+        match self.data_mut() {
+            &mut ValueData::Pair(ref mut a, ref mut b) => Some((a, b)),
+            _ => None,
+        }
+    }
+
     pub fn get_fn_ptr(&self) -> Option<fn(&mut Interpreter, &mut [Value]) -> Value> {
         match self.data() {
             &ValueData::NativeProc(f) => Some(unsafe { mem::transmute(f) }),
@@ -146,6 +158,13 @@ impl Value {
         let s = check_type!(Value::get_string, a, "string");
         Value::new_ident(s)
     }
+
+    pub fn new_list(elements: &[Value]) -> Value {
+        if elements.len() == 0 { return Value::empty_list(); }
+        let mut iter = elements.into_iter().rev();
+        let last = iter.next().unwrap(); // safe because list len must be >= 1
+        iter.fold(Value::new_pair(last.clone(), Value::empty_list()), |prev_pair, value| Value::new_pair(value.clone(), prev_pair))
+    }
 }
 
 impl fmt::Display for Value {
@@ -183,7 +202,7 @@ impl<'a> Iterator for ListIter<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ValueData {
+enum ValueData {
     Bool(bool),
     Char(char),
     Integer(i64),

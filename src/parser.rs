@@ -178,9 +178,7 @@ named!(list<&[u8], Value, ParserError>,
                 list_inner,
                 tag!(")")),
             |x: Vec<Value>| {
-                let mut iter = x.into_iter().rev();
-                let last = iter.next().unwrap(); // safe because list len must be >= 1
-                iter.fold(Value::new_pair(last, Value::empty_list()), |prev_pair, value| Value::new_pair(value, prev_pair))
+                Value::new_list(&x)
             }))
         ));
 

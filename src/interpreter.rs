@@ -1,4 +1,4 @@
-use super::value::{Value, ValueData, ListIter};
+use super::value::{Value, ListIter};
 use super::scope::Scope;
 use super::native;
 
@@ -49,6 +49,12 @@ impl Interpreter {
         self.current_scope.add_ident("<", Value::new_native_proc(native::lt));
         self.current_scope.add_ident("<=", Value::new_native_proc(native::le));
 
+        self.current_scope.add_ident("cons", Value::new_native_proc(native::cons));
+        self.current_scope.add_ident("list", Value::new_native_proc(native::list));
+        self.current_scope.add_ident("car", Value::new_native_proc(native::car));
+        self.current_scope.add_ident("cdr", Value::new_native_proc(native::cdr));
+        self.current_scope.add_ident("set-car!", Value::new_native_proc(native::set_car_));
+        self.current_scope.add_ident("set-cdr!", Value::new_native_proc(native::set_cdr_));
     }
 
 /*
@@ -78,14 +84,13 @@ impl Interpreter {
             } else {
                 panic!("tried to call {}, which is not possible", func)
             }
+        } else if let Some(ident) = value.get_ident() {
+            self.current_scope
+            .lookup_ident(ident)
+            .cloned()
+            .unwrap_or_else(|| panic!("undefined ident: {}", value))
         } else {
-            match value.data() {
-                &ValueData::Ident(ref s) => {
-                    self.current_scope.lookup_ident(s)
-                    .unwrap_or_else(|| panic!("undefined ident: {}", s))
-                },
-                _ => value.clone()
-            }
+            value.clone()
         }
     }
 }

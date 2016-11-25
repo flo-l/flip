@@ -163,3 +163,82 @@ comparison_operator!(lt, "<", PartialOrd::lt);
 comparison_operator!(le, "<=", PartialOrd::le);
 comparison_operator!(gt, ">", PartialOrd::gt);
 comparison_operator!(ge, ">=", PartialOrd::ge);
+
+// List operations:
+eval_args!(fn car(args: &mut [Value]) -> Value {
+    if args.len() != 1 {
+        panic!("car accepts exactly 1 argument");
+    }
+
+    if let Some((a, _)) = args[0].get_pair() {
+        a.clone()
+    } else {
+        panic!("expected pair, got {}", &args[0])
+    }
+});
+
+eval_args!(fn cdr(args: &mut [Value]) -> Value {
+    if args.len() != 1 {
+        panic!("cdr accepts exactly 1 argument");
+    }
+
+    if let Some((_, b)) = args[0].get_pair() {
+        b.clone()
+    } else {
+        panic!("expected pair, got {}", &args[0])
+    }
+});
+
+eval_args!(fn cons(args: &mut [Value]) -> Value {
+    if args.len() != 2 {
+        panic!("cons accepts exactly 2 argument");
+    }
+
+    Value::new_pair(args[0].clone(), args[1].clone())
+});
+
+eval_args!(fn list(args: &mut [Value]) -> Value {
+    Value::new_list(args)
+});
+
+pub fn set_car_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    if args.len() != 2 {
+        panic!("set_car! accepts exactly 2 argument");
+    }
+
+    let (f, elem) = args.split_at(1);
+    let (f, elem) = (&f[0], &elem[0]);
+    if f.get_ident().is_some() {
+        let old_pair = interpreter.evaluate(f);
+        if let Some((_, b)) = old_pair.get_pair() {
+            let new_pair = Value::new_pair(elem.clone(), b.clone());
+            let quoted = Value::new_list(&[Value::new_ident("quote"), new_pair]);
+            define(interpreter, &mut [f.clone(), quoted])
+        } else {
+            panic!("expected pair, got {}", old_pair)
+        }
+    } else {
+        panic!("expected symbol, got {}", f)
+    }
+}
+
+pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    if args.len() != 2 {
+        panic!("set_cdr! accepts exactly 2 argument");
+    }
+
+    let (f, elem) = args.split_at(1);
+    let (f, elem) = (&f[0], &elem[0]);
+    if f.get_ident().is_some() {
+        let old_pair = interpreter.evaluate(f);
+        if let Some((a, _)) = old_pair.get_pair() {
+            let new_pair = Value::new_pair(a.clone(), elem.clone());
+            let quoted = Value::new_list(&[Value::new_ident("quote"), new_pair]);
+            define(interpreter, &mut [f.clone(), quoted])
+        } else {
+            panic!("expected pair, got {}", old_pair)
+        }
+    } else {
+        panic!("expected symbol, got {}", f)
+    }
+}

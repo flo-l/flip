@@ -25,13 +25,13 @@ impl Scope {
         }
     }
 
-    pub fn lookup_ident(&self, ident: &str) -> Option<Value> {
+    pub fn lookup_ident(&self, ident: &str) -> Option<&Value> {
         let id = intern_ident(ident);
         self.lookup_id(id)
     }
 
-    fn lookup_id(&self, id: u64) -> Option<Value> {
-        self.idents.get(&id).cloned()
+    fn lookup_id(&self, id: u64) -> Option<&Value> {
+        self.idents.get(&id)
         .or_else(|| self.parent.as_ref().and_then(|p| p.lookup_id(id)))
     }
 
