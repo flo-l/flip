@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::borrow::Cow;
 use siphasher::sip::SipHasher24 as SipHasher;
 
 use super::value::Value;
 
 #[derive(Debug)]
 pub struct Scope {
-    idents: HashMap<u64, Value>,
+    idents: HashMap<u64, (String, Value)>,
     parent: Option<Box<Scope>>,
 }
 
@@ -25,19 +26,16 @@ impl Scope {
         }
     }
 
-    pub fn lookup_ident(&self, ident: &str) -> Option<&Value> {
-        let id = intern_ident(ident);
-        self.lookup_id(id)
-    }
-
-    fn lookup_id(&self, id: u64) -> Option<&Value> {
+    pub fn lookup_ident(&self, id: u64) -> Option<&Value> {
         self.idents.get(&id)
+        .map(|&(ident, value)| &value)
         .or_else(|| self.parent.as_ref().and_then(|p| p.lookup_id(id)))
     }
 
-    pub fn add_ident(&mut self, ident: &str, value: Value) {
-        let id = intern_ident(ident);
-        self.idents.insert(id, value);
+    pub fn add_ident<'a, T: 'a + Into<Cow<'a, str>>>(&mut self, ident: T, value: Value) {
+        let ident = ident.into();
+        let id = intern_ident(&ident);
+        self.idents.insert(id, (ident.into_owned(), value));
     }
 }
 
