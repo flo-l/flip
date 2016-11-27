@@ -2,6 +2,7 @@ use nom::{self, digit, multispace, eof, ErrorKind, IResult};
 use std::str;
 use std::fmt;
 use super::value::Value;
+use super::scope::Scope;
 
 static UTF8_ERROR: &'static str = "File is no valid UTF8!";
 
@@ -40,7 +41,7 @@ fn is_valid_in_ident(x: u8) -> bool {
 named!(ident<&[u8], Value, ParserError>, fix!(chain!(
     peek!(none_of!("0123456789().")) ~
     x: take_while1!(is_valid_in_ident),
-    || Value::new_ident((str::from_utf8(x).unwrap())))));
+    || Value::new_symbol((str::from_utf8(x).unwrap())))));
 
 named!(pub integer<&[u8], Value, ParserError>,
     fix!(chain!(
@@ -148,7 +149,7 @@ named!(item<&[u8], Value, ParserError>,
             list) ~
         peek!(end_of_item),
         || if quoted.is_some() {
-            Value::new_pair(Value::new_ident("quote"), Value::new_pair(value, Value::empty_list()))
+            Value::new_pair(Value::new_symbol("quote"), Value::new_pair(value, Value::empty_list()))
         } else { value })));
 
 named!(pair<&[u8], Value, ParserError>,

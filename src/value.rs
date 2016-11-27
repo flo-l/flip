@@ -3,6 +3,8 @@ use std::rc::Rc;
 use std::borrow::Cow;
 use std::mem;
 use std::char;
+use std::hash::{Hash, Hasher};
+use siphasher::sip::SipHasher24 as SipHasher;
 use super::interpreter::Interpreter;
 use super::parser;
 
@@ -27,7 +29,7 @@ impl Value {
     pub fn new_bool(x: bool) -> Self { Self::new_with(ValueData::Bool(x)) }
     pub fn new_char(x: char) -> Self { Self::new_with(ValueData::Char(x)) }
     pub fn new_integer(x: i64) -> Self { Self::new_with(ValueData::Integer(x)) }
-    pub fn new_ident<'a, T: 'a + Into<Cow<'a, str>>>(x: T) -> Self { Self::new_with(ValueData::Ident(x.into().into_owned())) }
+    pub fn new_symbol<'a, T: 'a + Into<Cow<'a, str>>>(s: T) -> Self { Self::new_with(ValueData::Symbol(s.into().into_owned())) }
     pub fn new_string<'a, T: 'a + Into<Cow<'a, str>>>(x: T) -> Self { Self::new_with(ValueData::String(x.into().into_owned())) }
     pub fn new_pair(a: Value, b: Value) -> Self { Self::new_with(ValueData::Pair(a,b)) }
     pub fn empty_list() -> Self { Self::new_with(ValueData::EmptyList) }
@@ -38,9 +40,6 @@ impl Value {
 
     fn data(&self) -> &ValueData {
         &*self.val_ptr
-    }
-    fn data_mut(&mut self) -> &mut ValueData {
-        Rc::get_mut(&mut self.val_ptr).unwrap()
     }
 
     fn is_pair(&self) -> bool {
@@ -63,9 +62,9 @@ impl Value {
         if let &ValueData::EmptyList = self.data() { Some(()) } else { None }
     }
 
-    pub fn get_ident(&self) -> Option<&str> {
+    pub fn get_symbol(&self) -> Option<&str> {
         match self.data() {
-            &ValueData::Ident(ref s) => Some(&*s),
+            &ValueData::Symbol(ref s) => Some(&s),
             _ => None,
         }
     }
@@ -101,13 +100,6 @@ impl Value {
     pub fn get_pair(&self) -> Option<(&Value, &Value)> {
         match self.data() {
             &ValueData::Pair(ref a, ref b) => Some((a, b)),
-            _ => None,
-        }
-    }
-
-    pub fn get_pair_mut(&mut self) -> Option<(&mut Value, &mut Value)> {
-        match self.data_mut() {
-            &mut ValueData::Pair(ref mut a, ref mut b) => Some((a, b)),
             _ => None,
         }
     }
@@ -149,14 +141,14 @@ impl Value {
         }
     }
 
-    pub fn from_symbol_to_string(a: &Value) -> Value {
-        let s = check_type!(Value::get_ident, a, "symbol");
-        Value::new_string(s)
-    }
-
     pub fn from_string_to_symbol(a: &Value) -> Value {
         let s = check_type!(Value::get_string, a, "string");
-        Value::new_ident(s)
+        Value::new_symbol(s.clone())
+    }
+
+    pub fn from_symbol_to_string(a: &Value) -> Value {
+        let s = check_type!(Value::get_symbol, a, "symbol");
+        Value::new_string(s.clone())
     }
 
     pub fn new_list(elements: &[Value]) -> Value {
@@ -165,6 +157,12 @@ impl Value {
         let last = iter.next().unwrap(); // safe because list len must be >= 1
         iter.fold(Value::new_pair(last.clone(), Value::empty_list()), |prev_pair, value| Value::new_pair(value.clone(), prev_pair))
     }
+}
+
+pub fn intern_symbol(ident: &str) -> u64 {
+    let mut s = SipHasher::new();
+    ident.hash(&mut s);
+    s.finish()
 }
 
 impl fmt::Display for Value {
@@ -206,7 +204,7 @@ enum ValueData {
     Bool(bool),
     Char(char),
     Integer(i64),
-    Ident(String),
+    Symbol(String),
     String(String),
     Pair(Value, Value),
     EmptyList,
@@ -219,7 +217,7 @@ impl fmt::Display for ValueData {
             &ValueData::Bool(x) => write!(f, "{}", x),
             &ValueData::Char(x) => write!(f, "{}", x),
             &ValueData::Integer(x) => write!(f, "{}", x),
-            &ValueData::Ident(ref x) => write!(f, "{}", x),
+            &ValueData::Symbol(ref s) => write!(f, "{}", s),
             &ValueData::String(ref x) => write!(f, "\"{}\"", x),
             &ValueData::Pair(ref a, ref b) if b.is_pair() || b.is_empty_list() => {
                 let iter = ListIter::new(b);

@@ -16,53 +16,55 @@ impl Interpreter {
     }
 
     fn init(&mut self) {
-        self.current_scope.add_ident("quote", Value::new_native_proc(native::quote));
-        self.current_scope.add_ident("define", Value::new_native_proc(native::define));
-        self.current_scope.add_ident("set!", Value::new_native_proc(native::set));
-        self.current_scope.add_ident("if", Value::new_native_proc(native::if_));
+        self.current_scope.add_symbol("quote", Value::new_native_proc(native::quote));
+        self.current_scope.add_symbol("define", Value::new_native_proc(native::define));
+        self.current_scope.add_symbol("set!", Value::new_native_proc(native::set));
+        self.current_scope.add_symbol("if", Value::new_native_proc(native::if_));
 
-        self.current_scope.add_ident("null?", Value::new_native_proc(native::null_));
-        self.current_scope.add_ident("boolean?", Value::new_native_proc(native::boolean_));
-        self.current_scope.add_ident("symbol?", Value::new_native_proc(native::symbol_));
-        self.current_scope.add_ident("integer?", Value::new_native_proc(native::integer_));
-        self.current_scope.add_ident("char?", Value::new_native_proc(native::char_));
-        self.current_scope.add_ident("string?", Value::new_native_proc(native::string_));
-        self.current_scope.add_ident("pair?", Value::new_native_proc(native::pair_));
-        self.current_scope.add_ident("procedure?", Value::new_native_proc(native::procedure_));
+        self.current_scope.add_symbol("null?", Value::new_native_proc(native::null_));
+        self.current_scope.add_symbol("boolean?", Value::new_native_proc(native::boolean_));
+        self.current_scope.add_symbol("symbol?", Value::new_native_proc(native::symbol_));
+        self.current_scope.add_symbol("integer?", Value::new_native_proc(native::integer_));
+        self.current_scope.add_symbol("char?", Value::new_native_proc(native::char_));
+        self.current_scope.add_symbol("string?", Value::new_native_proc(native::string_));
+        self.current_scope.add_symbol("pair?", Value::new_native_proc(native::pair_));
+        self.current_scope.add_symbol("procedure?", Value::new_native_proc(native::procedure_));
 
-        self.current_scope.add_ident("char->integer", Value::new_native_proc(native::char_integer));
-        self.current_scope.add_ident("integer->char", Value::new_native_proc(native::integer_char));
-        self.current_scope.add_ident("number->string", Value::new_native_proc(native::number_string));
-        self.current_scope.add_ident("string->number", Value::new_native_proc(native::string_number));
-        self.current_scope.add_ident("symbol->string", Value::new_native_proc(native::symbol_string));
-        self.current_scope.add_ident("string->symbol", Value::new_native_proc(native::string_symbol));
+        self.current_scope.add_symbol("char->integer", Value::new_native_proc(native::char_integer));
+        self.current_scope.add_symbol("integer->char", Value::new_native_proc(native::integer_char));
+        self.current_scope.add_symbol("number->string", Value::new_native_proc(native::number_string));
+        self.current_scope.add_symbol("string->number", Value::new_native_proc(native::string_number));
+        self.current_scope.add_symbol("symbol->string", Value::new_native_proc(native::symbol_string));
+        self.current_scope.add_symbol("string->symbol", Value::new_native_proc(native::string_symbol));
 
-        self.current_scope.add_ident("+", Value::new_native_proc(native::plus));
-        self.current_scope.add_ident("-", Value::new_native_proc(native::minus));
-        self.current_scope.add_ident("*", Value::new_native_proc(native::multiply));
-        self.current_scope.add_ident("quotient", Value::new_native_proc(native::quotient));
-        self.current_scope.add_ident("remainder", Value::new_native_proc(native::remainder));
+        self.current_scope.add_symbol("+", Value::new_native_proc(native::plus));
+        self.current_scope.add_symbol("-", Value::new_native_proc(native::minus));
+        self.current_scope.add_symbol("*", Value::new_native_proc(native::multiply));
+        self.current_scope.add_symbol("quotient", Value::new_native_proc(native::quotient));
+        self.current_scope.add_symbol("remainder", Value::new_native_proc(native::remainder));
 
-        self.current_scope.add_ident("=", Value::new_native_proc(native::eq));
-        self.current_scope.add_ident(">", Value::new_native_proc(native::gt));
-        self.current_scope.add_ident(">=", Value::new_native_proc(native::ge));
-        self.current_scope.add_ident("<", Value::new_native_proc(native::lt));
-        self.current_scope.add_ident("<=", Value::new_native_proc(native::le));
+        self.current_scope.add_symbol("=", Value::new_native_proc(native::eq));
+        self.current_scope.add_symbol(">", Value::new_native_proc(native::gt));
+        self.current_scope.add_symbol(">=", Value::new_native_proc(native::ge));
+        self.current_scope.add_symbol("<", Value::new_native_proc(native::lt));
+        self.current_scope.add_symbol("<=", Value::new_native_proc(native::le));
 
-        self.current_scope.add_ident("cons", Value::new_native_proc(native::cons));
-        self.current_scope.add_ident("list", Value::new_native_proc(native::list));
-        self.current_scope.add_ident("car", Value::new_native_proc(native::car));
-        self.current_scope.add_ident("cdr", Value::new_native_proc(native::cdr));
-        self.current_scope.add_ident("set-car!", Value::new_native_proc(native::set_car_));
-        self.current_scope.add_ident("set-cdr!", Value::new_native_proc(native::set_cdr_));
+        self.current_scope.add_symbol("cons", Value::new_native_proc(native::cons));
+        self.current_scope.add_symbol("list", Value::new_native_proc(native::list));
+        self.current_scope.add_symbol("car", Value::new_native_proc(native::car));
+        self.current_scope.add_symbol("cdr", Value::new_native_proc(native::cdr));
+        self.current_scope.add_symbol("set-car!", Value::new_native_proc(native::set_car_));
+        self.current_scope.add_symbol("set-cdr!", Value::new_native_proc(native::set_cdr_));
+
+        self.current_scope.add_symbol("symbol-space", Value::new_native_proc(native::symbol_space));
     }
 
 /*
-    pub fn lookup_ident(ident: &str) -> Value {
-        if let Some(val) = self.scopes.last().lookup_ident(ident) {
+    pub fn lookup_symbol(ident: &str) -> Value {
+        if let Some(val) = self.scopes.last().lookup_symbol(ident) {
             val
         } else {
-            println!("Searched Ident: {:?}", scope::intern_ident(ident));
+            println!("Searched Ident: {:?}", scope::intern_symbol(ident));
             println!("Known Idents: ");
             for x in &self.scopes {
                 for (hash, value) in &x.idents {
@@ -84,10 +86,10 @@ impl Interpreter {
             } else {
                 panic!("tried to call {}, which is not possible", func)
             }
-        } else if let Some(ident) = value.get_ident() {
+        } else if let Some(symbol) = value.get_symbol() {
             self.current_scope
-            .lookup_ident(ident)
-            .cloned()
+            .lookup_symbol_string(symbol)
+            .map(|&(_, ref value)| value.clone())
             .unwrap_or_else(|| panic!("undefined ident: {}", value))
         } else {
             value.clone()

@@ -1,6 +1,7 @@
 use std::ops::{Add, Sub, Mul, Div, Rem};
 use super::value::Value;
 use super::interpreter::Interpreter;
+use super::scope::SymbolIterator;
 
 pub fn quote(_: &mut Interpreter, args: &mut [Value]) -> Value {
     if args.len() != 1 {
@@ -14,9 +15,9 @@ pub fn define(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         panic!("define accepts exactly 2 arguments");
     }
 
-    if let Some(x) = args[0].get_ident() {
+    if let Some(x) = args[0].get_symbol() {
         let item = interpreter.evaluate(&args[1]);
-        interpreter.current_scope.add_ident(x, item);
+        interpreter.current_scope.add_symbol(&*x, item);
         args[0].clone()
     } else {
         panic!("first arg of define has to be an ident, got: {}", args[0]);
@@ -28,10 +29,10 @@ pub fn set(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         panic!("set! accepts exactly 2 arguments");
     }
 
-    if let Some(x) = args[0].get_ident() {
-        if interpreter.current_scope.lookup_ident(x).is_some() {
+    if let Some(x) = args[0].get_symbol() {
+        if interpreter.current_scope.lookup_symbol_string(x).is_some() {
             let item = interpreter.evaluate(&args[1]);
-            interpreter.current_scope.add_ident(x, item);
+            interpreter.current_scope.add_symbol(x, item);
             args[0].clone()
         } else {
             panic!("ident undefined: {}", args[0]);
@@ -85,7 +86,7 @@ macro_rules! type_checker {
 
 type_checker!(null_, "null?", get_empty_list);
 type_checker!(boolean_, "boolean?", get_bool);
-type_checker!(symbol_, "symbol?", get_ident);
+type_checker!(symbol_, "symbol?", get_symbol);
 type_checker!(integer_, "integer?", get_integer);
 type_checker!(char_, "char?", get_char);
 type_checker!(string_, "string?", get_string);
@@ -208,11 +209,11 @@ pub fn set_car_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 
     let (f, elem) = args.split_at(1);
     let (f, elem) = (&f[0], &elem[0]);
-    if f.get_ident().is_some() {
+    if f.get_symbol().is_some() {
         let old_pair = interpreter.evaluate(f);
         if let Some((_, b)) = old_pair.get_pair() {
             let new_pair = Value::new_pair(elem.clone(), b.clone());
-            let quoted = Value::new_list(&[Value::new_ident("quote"), new_pair]);
+            let quoted = Value::new_list(&[Value::new_symbol("quote"), new_pair]);
             define(interpreter, &mut [f.clone(), quoted])
         } else {
             panic!("expected pair, got {}", old_pair)
@@ -229,11 +230,11 @@ pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 
     let (f, elem) = args.split_at(1);
     let (f, elem) = (&f[0], &elem[0]);
-    if f.get_ident().is_some() {
+    if f.get_symbol().is_some() {
         let old_pair = interpreter.evaluate(f);
         if let Some((a, _)) = old_pair.get_pair() {
             let new_pair = Value::new_pair(a.clone(), elem.clone());
-            let quoted = Value::new_list(&[Value::new_ident("quote"), new_pair]);
+            let quoted = Value::new_list(&[Value::new_symbol("quote"), new_pair]);
             define(interpreter, &mut [f.clone(), quoted])
         } else {
             panic!("expected pair, got {}", old_pair)
@@ -241,4 +242,16 @@ pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     } else {
         panic!("expected symbol, got {}", f)
     }
+}
+
+pub fn symbol_space(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    if args.len() != 0 {
+        panic!("symbol-space accepts no arguments");
+    }
+
+    let symbols: Vec<Value> = SymbolIterator::new(&interpreter.current_scope)
+    .map(|(_, &(ref s, _))| Value::new_symbol(s.clone()))
+    .collect();
+
+    Value::new_list(&symbols)
 }
