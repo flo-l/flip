@@ -313,10 +313,10 @@ mod test {
 
     #[test]
     fn ident_() {
-        expect_ok!(ident, "+", Value::new_ident("+"));
-        expect_ok!(ident, "a1a", Value::new_ident("a"), "1a");
-        expect_ok!(ident, "num->str", Value::new_ident("num->str"));
-        expect_ok!(ident, "//", Value::new_ident("//"));
+        expect_ok!(ident, "+", Value::new_symbol("+"));
+        expect_ok!(ident, "a1a", Value::new_symbol("a"), "1a");
+        expect_ok!(ident, "num->str", Value::new_symbol("num->str"));
+        expect_ok!(ident, "//", Value::new_symbol("//"));
 
         expect_error!(ident, "1a", 0);
     }
