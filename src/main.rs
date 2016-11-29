@@ -3,8 +3,10 @@
 
 extern crate rustyline;
 extern crate siphasher;
+extern crate lalrpop_util;
 
 mod cli;
+mod grammar;
 mod parser;
 mod value;
 mod interpreter;

@@ -1,0 +1,12 @@
+use std::str::FromStr;
+use ::value::Value;
+
+grammar;
+
+pub Bool: Value = {
+  True => Value::new_bool(true),
+  False => Value::new_bool(false),
+};
+
+True = { "true" };
+False = { "false" };
