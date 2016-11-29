@@ -1,12 +1,18 @@
 use std::str::FromStr;
 use ::value::Value;
 
-grammar;
+#[LALR] grammar;
 
 pub Bool: Value = {
-  True => Value::new_bool(true),
-  False => Value::new_bool(false),
+  "true" => Value::new_bool(true),
+  "false" => Value::new_bool(false),
 };
 
-True = { "true" };
-False = { "false" };
+pub Char: Value = {
+    <c:r"#\\\S"> => Value::new_char(c.chars().take(2).next().unwrap()),
+};
+
+pub Integer: Value = {
+    <i:r"[0-9]+"> => Value::new_integer(i64::from_str(i).unwrap()),
+    "-" <i:r"[0-9]+"> => Value::new_integer(-i64::from_str(i).unwrap()),
+};
