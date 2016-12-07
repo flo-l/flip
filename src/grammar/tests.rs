@@ -226,3 +226,16 @@ fn list() {
 
     expect_error!(parse_List, "(( ())");
 }
+
+#[test]
+fn quote() {
+    use super::parse_Item;
+    fn quoted(v: Value) -> Value { Value::new_list(&[Value::new_symbol("quote"), v]) }
+    expect_ok!(parse_Item, "'()", quoted(Value::empty_list()));
+    expect_ok!(parse_Item, "'1", quoted(Value::new_integer(1)));
+    expect_ok!(parse_Item, "'true", quoted(Value::new_bool(true)));
+    expect_ok!(parse_Item, r#"'"2""#, quoted(Value::new_string("2")));
+    expect_ok!(parse_Item, "'#\\a", quoted(Value::new_char('a')));
+    expect_ok!(parse_Item, "'sym", quoted(Value::new_symbol("sym")));
+    expect_ok!(parse_Item, "'(1 2)", quoted(Value::new_list(&[Value::new_integer(1), Value::new_integer(2)])));
+}

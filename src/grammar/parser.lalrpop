@@ -62,7 +62,8 @@ pub List: Value = {
     },
 };
 
-Item: Value = {
+pub Item: Value = {
+    Quote <Item> => Value::new_list(&[Value::new_symbol("quote"), <>]),
     Char,
     Integer,
     Symbol,
