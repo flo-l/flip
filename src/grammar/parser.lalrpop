@@ -44,9 +44,20 @@ pub String: Value = {
    <s:Str> => Value::new_string(unescape_string(s)),
 };
 
+EmptyList: Value = {
+    OpenParen WhiteSpace? ClosingParen => Value::empty_list(),
+};
+
+pub Pair: Value = {
+    OpenParen WhiteSpace? <a:Item> WhiteSpace Dot WhiteSpace <b:Item> WhiteSpace? ClosingParen
+    => Value::new_pair(a, b),
+};
+
 Item: Value = {
     Char,
     Integer,
     Symbol,
     String,
+    EmptyList,
+    Pair,
 };

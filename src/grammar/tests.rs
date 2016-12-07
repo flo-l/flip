@@ -199,7 +199,7 @@ fn string() {
     expect_error!(parse_String, "\"", EOF);
     expect_error!(parse_String, "\"❤\"", INVALID_CHAR); // non ascii
 }
-/*
+
 #[test]
 fn pair() {
     use super::parse_Pair;
@@ -210,10 +210,9 @@ fn pair() {
     expect_ok!(parse_Pair, "(true . false)", Value::new_pair(t.clone(), f.clone()));
     expect_ok!(parse_Pair, "(true . (false . ()))", Value::new_pair(t, Value::new_pair(f.clone(), e.clone())));
 
-    expect_error!(parse_Pair, "(1 .)", 0);
-    expect_error!(parse_Pair, "(. 2)", 0);
-    expect_error!(parse_Pair, "(1 . 2 3)", 0);
-    expect_error!(parse_Pair, "(1 . 2 . 3)", 0);
-    expect_error!(parse_Pair, "(1 2 . 3)", 0);
+    expect_error!(parse_Pair, "(1 .)", 4);
+    expect_error!(parse_Pair, "(. 2)", 1);
+    expect_error!(parse_Pair, "(1 . 2 3)", 7);
+    expect_error!(parse_Pair, "(1 . 2 . 3)", 7);
+    expect_error!(parse_Pair, "(1 2 . 3)", 3);
 }
-*/
