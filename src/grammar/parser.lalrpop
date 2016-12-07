@@ -1,18 +1,52 @@
 use std::str::FromStr;
 use ::value::Value;
+use ::grammar::unescape_string;
+use super::lexer::{Token, Error};
 
-#[LALR] grammar;
+grammar<'input>(text: &'input str);
 
-pub Bool: Value = {
-  "true" => Value::new_bool(true),
-  "false" => Value::new_bool(false),
-};
+extern {
+    type Location = usize;
+    type Error = Error;
+
+    enum Token<'input> {
+        OpenParen => Token::OpenParen,
+        ClosingParen => Token::ClosingParen,
+        Dot => Token::Dot,
+        Quote => Token::Quote,
+        WhiteSpace => Token::WhiteSpace,
+        Chr => Token::Char(<char>),
+        Int => Token::Integer(<i64>),
+        Str => Token::String(<&'input str>),
+        Sym => Token::Symbol(<&'input str>),
+    }
+}
 
 pub Char: Value = {
-    <c:r"#\\\S"> => Value::new_char(c.chars().take(2).next().unwrap()),
+    <c:Chr> => Value::new_char(c),
 };
 
 pub Integer: Value = {
-    <i:r"[0-9]+"> => Value::new_integer(i64::from_str(i).unwrap()),
-    "-" <i:r"[0-9]+"> => Value::new_integer(-i64::from_str(i).unwrap()),
+    <i:Int> => Value::new_integer(i),
+};
+
+pub Symbol: Value = {
+   <s:Sym> => {
+       match s {
+           "true" => Value::new_bool(true),
+           "false" => Value::new_bool(false),
+           s => Value::new_symbol(s),
+       }
+   },
+};
+
+pub String: Value = {
+   <s:Str> => Value::new_string(unescape_string(s)),
+};
+
+Item: Value = {
+    Char,
+    Integer,
+    Symbol,
+    String,
 };
