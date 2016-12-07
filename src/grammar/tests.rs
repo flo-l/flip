@@ -216,3 +216,13 @@ fn pair() {
     expect_error!(parse_Pair, "(1 . 2 . 3)", 7);
     expect_error!(parse_Pair, "(1 2 . 3)", 3);
 }
+
+#[test]
+fn list() {
+    use super::parse_List;
+    expect_ok!(parse_List, "()", Value::empty_list());
+    expect_ok!(parse_List, r#"(1 "2" (3 . 4))"#, Value::new_list(&vec![Value::new_integer(1), Value::new_string("2"), Value::new_pair(Value::new_integer(3), Value::new_integer(4))]));
+    expect_ok!(parse_List, "(() ())", Value::new_list(&vec![Value::empty_list(), Value::empty_list()]));
+
+    expect_error!(parse_List, "(( ())");
+}

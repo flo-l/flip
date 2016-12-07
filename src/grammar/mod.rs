@@ -49,3 +49,4 @@ create_parser!(parse_Integer);
 create_parser!(parse_Symbol);
 create_parser!(parse_String);
 create_parser!(parse_Pair);
+create_parser!(parse_List);

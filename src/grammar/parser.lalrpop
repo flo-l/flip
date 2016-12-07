@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::iter;
 use ::value::Value;
 use ::grammar::unescape_string;
 use super::lexer::{Token, Error};
@@ -53,11 +54,19 @@ pub Pair: Value = {
     => Value::new_pair(a, b),
 };
 
+pub List: Value = {
+    EmptyList,
+    OpenParen WhiteSpace? <v:(Item WhiteSpace)*> <last:Item> WhiteSpace? ClosingParen => {
+        let values: Vec<Value> = v.into_iter().map(|(v, _)| v).chain(iter::once(last)).collect();
+        Value::new_list(&values)
+    },
+};
+
 Item: Value = {
     Char,
     Integer,
     Symbol,
     String,
-    EmptyList,
     Pair,
+    List,
 };
