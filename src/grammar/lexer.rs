@@ -177,6 +177,11 @@ impl<'input> Iterator for Tokenizer<'input> {
                 },
                 // number
                 Some((start, x)) if numeric(x) => return self.parse_integer(start),
+                // whitespace
+                Some((start, x)) if whitespace(x) => {
+                    let len = self.eat_until(start, |c| !whitespace(c)).len();
+                    return Tokenizer::token_at(start..len, Token::WhiteSpace);
+                },
                 // string, + 1 bc we don't need the '"' in string content
                 Some((start, '"')) => return self.parse_string(start+1),
                 // symbol
