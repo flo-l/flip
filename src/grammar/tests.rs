@@ -1,6 +1,7 @@
 use std::usize;
-use super::super::value::Value;
 use lalrpop_util::ParseError;
+use ::value::Value;
+use super::parse;
 use super::lexer::{Token, Error};
 
 const EOF: usize = usize::MAX;
@@ -64,7 +65,7 @@ macro_rules! expect_error {
                 panic!("for input: {:?}, got error {:?} at pos {}, expected pos: {}", input, result, $token_fn(err), $position)
             }
         } else {
-            panic!("expected error for string: {:?}, got: {:?}", input, result);
+            panic!("expected error for string: '{}', got: {:?}", input, result);
         }
     );
 }
@@ -87,16 +88,14 @@ macro_rules! expect_ok {
 
 #[test]
 fn bool() {
-    use super::parse_Symbol;
-    expect_ok!(parse_Symbol, "true", Value::new_bool(true));
-    expect_ok!(parse_Symbol, "false", Value::new_bool(false));
-    expect_ok!(parse_Symbol, "trude", Value::new_symbol("trude"));
-    expect_ok!(parse_Symbol, "fale", Value::new_symbol("fale"));
+    expect_ok!(parse, "true", Value::new_bool(true));
+    expect_ok!(parse, "false", Value::new_bool(false));
+    expect_ok!(parse, "trude", Value::new_symbol("trude"));
+    expect_ok!(parse, "fale", Value::new_symbol("fale"));
 }
 
 #[test]
 fn char() {
-    use super::parse_Char;
     use std::char;
     use std::iter;
     let mut input: String = "#\\".into();
@@ -104,7 +103,7 @@ fn char() {
     for x in printlable_asci {
         let c = char::from_u32(x).expect(&format!("tried to create invalid char with: 0x{:X}", x));
         input.push(c);
-        { expect_ok!(parse_Char, input, Value::new_char(c)); }
+        { expect_ok!(parse, input, Value::new_char(c)); }
         input.pop();
     }
 
@@ -112,47 +111,45 @@ fn char() {
     for x in invalid_asci {
         let c = char::from_u32(x).expect(&format!("tried to create invalid char with: 0x{:X}", x));
         input.push(c);
-        { expect_error!(parse_Char, input); }
+        if c != '\n' && c != '\t' && c != ' ' { expect_error!(parse, input); }
         input.pop();
     }
 
     // special forms
-    expect_ok!(parse_Char, r"#\\s", Value::new_char(' '));
-    expect_ok!(parse_Char, r"#\\t", Value::new_char('\t'));
-    expect_ok!(parse_Char, r"#\\n", Value::new_char('\n'));
-    expect_ok!(parse_Char, r"#\\", Value::new_char('\\'));
+    expect_ok!(parse, r"#\\s", Value::new_char(' '));
+    expect_ok!(parse, r"#\\t", Value::new_char('\t'));
+    expect_ok!(parse, r"#\\n", Value::new_char('\n'));
+    expect_ok!(parse, r"#\\", Value::new_char('\\'));
+    expect_ok!(parse, r"#\", Value::new_symbol(r"#\"));
 
-    expect_error!(parse_Char, r"#\ ", 0);
-    expect_error!(parse_Char, "#\\\n", 0);
+    expect_error!(parse, "#\\\0", 2);
 }
 
 #[test]
 fn integer() {
-    use super::parse_Integer;
-    expect_ok!(parse_Integer, "007", Value::new_integer(7));
-    expect_ok!(parse_Integer, "-007", Value::new_integer(-7));
-    expect_ok!(parse_Integer, "123456789", Value::new_integer(123456789));
-    expect_ok!(parse_Integer, "-123456789", Value::new_integer(-123456789));
+    expect_ok!(parse, "007", Value::new_integer(7));
+    expect_ok!(parse, "-007", Value::new_integer(-7));
+    expect_ok!(parse, "123456789", Value::new_integer(123456789));
+    expect_ok!(parse, "-123456789", Value::new_integer(-123456789));
 
-    expect_error!(parse_Integer, "123b456789", 3);
-    expect_error!(parse_Integer, "123456789c", 9);
-    expect_error!(parse_Integer, "00-7", 2);
-    expect_error!(parse_Integer, "a123456789", 0);
-    expect_error!(parse_Integer, "--7", 0);
+    expect_error!(parse, "123b456789", 3);
+    expect_error!(parse, "123456789c", 9);
+    expect_error!(parse, "00-7", 2);
+    expect_ok!(parse, "a123456789", Value::new_symbol("a123456789"));
+    expect_ok!(parse, "--7", Value::new_symbol("--7"));
 }
 
 #[test]
 fn symbol() {
-    use super::parse_Symbol;
-    expect_ok!(parse_Symbol, "+", Value::new_symbol("+"));
-    expect_ok!(parse_Symbol, "-", Value::new_symbol("-"));
-    expect_ok!(parse_Symbol, "#", Value::new_symbol("#"));
-    expect_ok!(parse_Symbol, "a1a", Value::new_symbol("a1a"));
-    expect_ok!(parse_Symbol, "num->str", Value::new_symbol("num->str"));
-    expect_ok!(parse_Symbol, "//", Value::new_symbol("//"));
+    expect_ok!(parse, "+", Value::new_symbol("+"));
+    expect_ok!(parse, "-", Value::new_symbol("-"));
+    expect_ok!(parse, "#", Value::new_symbol("#"));
+    expect_ok!(parse, "a1a", Value::new_symbol("a1a"));
+    expect_ok!(parse, "num->str", Value::new_symbol("num->str"));
+    expect_ok!(parse, "//", Value::new_symbol("//"));
 
     // error is at 1 bc lexer tries to lex integer
-    expect_error!(parse_Symbol, "1a", 1);
+    expect_error!(parse, "1a", 1);
 }
 
 // TODO
@@ -167,7 +164,6 @@ expect_error!(integer, "--7", 1);
 
 #[test]
 fn string() {
-    use super::parse_String;
     use std::iter;
     fn q(s: &str) -> String {
         iter::once('"')
@@ -180,7 +176,7 @@ fn string() {
         ($s:expr, $e:expr) => ({
             let s = q($s);
             println!("string: {}", s);
-            expect_ok!(parse_String, s, Value::new_string($e));
+            expect_ok!(parse, s, Value::new_string($e));
         });
 
         ($s:expr) => (expect_str_ok!($s, $s));
@@ -196,46 +192,43 @@ fn string() {
     expect_str_ok!(r"\\\\", "\\\\");
     expect_str_ok!(r#"Hi there: \" \\ \n \t"#, "Hi there: \" \\ \n \t");
 
-    expect_error!(parse_String, "\"", EOF);
-    expect_error!(parse_String, "\"❤\"", INVALID_CHAR); // non ascii
+    expect_error!(parse, "\"", EOF);
+    expect_error!(parse, "\"❤\"", INVALID_CHAR); // non ascii
 }
 
 #[test]
 fn pair() {
-    use super::parse_Pair;
     let t = Value::new_bool(true);
     let f = Value::new_bool(false);
     let e = Value::empty_list();
 
-    expect_ok!(parse_Pair, "(true . false)", Value::new_pair(t.clone(), f.clone()));
-    expect_ok!(parse_Pair, "(true . (false . ()))", Value::new_pair(t, Value::new_pair(f.clone(), e.clone())));
+    expect_ok!(parse, "(true . false)", Value::new_pair(t.clone(), f.clone()));
+    expect_ok!(parse, "(true . (false . ()))", Value::new_pair(t, Value::new_pair(f.clone(), e.clone())));
 
-    expect_error!(parse_Pair, "(1 .)", 4);
-    expect_error!(parse_Pair, "(. 2)", 1);
-    expect_error!(parse_Pair, "(1 . 2 3)", 7);
-    expect_error!(parse_Pair, "(1 . 2 . 3)", 7);
-    expect_error!(parse_Pair, "(1 2 . 3)", 3);
+    expect_error!(parse, "(1 .)", 4);
+    expect_error!(parse, "(. 2)", 1);
+    expect_error!(parse, "(1 . 2 3)", 7);
+    expect_error!(parse, "(1 . 2 . 3)", 7);
+    expect_error!(parse, "(1 2 . 3)", 5);
 }
 
 #[test]
 fn list() {
-    use super::parse_List;
-    expect_ok!(parse_List, "()", Value::empty_list());
-    expect_ok!(parse_List, r#"(1 "2" (3 . 4))"#, Value::new_list(&vec![Value::new_integer(1), Value::new_string("2"), Value::new_pair(Value::new_integer(3), Value::new_integer(4))]));
-    expect_ok!(parse_List, "(() ())", Value::new_list(&vec![Value::empty_list(), Value::empty_list()]));
+    expect_ok!(parse, "()", Value::empty_list());
+    expect_ok!(parse, r#"(1 "2" (3 . 4))"#, Value::new_list(&vec![Value::new_integer(1), Value::new_string("2"), Value::new_pair(Value::new_integer(3), Value::new_integer(4))]));
+    expect_ok!(parse, "(() ())", Value::new_list(&vec![Value::empty_list(), Value::empty_list()]));
 
-    expect_error!(parse_List, "(( ())");
+    expect_error!(parse, "(( ())");
 }
 
 #[test]
 fn quote() {
-    use super::parse_Item;
     fn quoted(v: Value) -> Value { Value::new_list(&[Value::new_symbol("quote"), v]) }
-    expect_ok!(parse_Item, "'()", quoted(Value::empty_list()));
-    expect_ok!(parse_Item, "'1", quoted(Value::new_integer(1)));
-    expect_ok!(parse_Item, "'true", quoted(Value::new_bool(true)));
-    expect_ok!(parse_Item, r#"'"2""#, quoted(Value::new_string("2")));
-    expect_ok!(parse_Item, "'#\\a", quoted(Value::new_char('a')));
-    expect_ok!(parse_Item, "'sym", quoted(Value::new_symbol("sym")));
-    expect_ok!(parse_Item, "'(1 2)", quoted(Value::new_list(&[Value::new_integer(1), Value::new_integer(2)])));
+    expect_ok!(parse, "'()", quoted(Value::empty_list()));
+    expect_ok!(parse, "'1", quoted(Value::new_integer(1)));
+    expect_ok!(parse, "'true", quoted(Value::new_bool(true)));
+    expect_ok!(parse, r#"'"2""#, quoted(Value::new_string("2")));
+    expect_ok!(parse, "'#\\a", quoted(Value::new_char('a')));
+    expect_ok!(parse, "'sym", quoted(Value::new_symbol("sym")));
+    expect_ok!(parse, "'(1 2)", quoted(Value::new_list(&[Value::new_integer(1), Value::new_integer(2)])));
 }

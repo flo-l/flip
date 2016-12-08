@@ -23,15 +23,15 @@ extern {
     }
 }
 
-pub Char: Value = {
+Char: Value = {
     <c:Chr> => Value::new_char(c),
 };
 
-pub Integer: Value = {
+Integer: Value = {
     <i:Int> => Value::new_integer(i),
 };
 
-pub Symbol: Value = {
+Symbol: Value = {
    <s:Sym> => {
        match s {
            "true" => Value::new_bool(true),
@@ -41,7 +41,7 @@ pub Symbol: Value = {
    },
 };
 
-pub String: Value = {
+String: Value = {
    <s:Str> => Value::new_string(unescape_string(s)),
 };
 
@@ -49,12 +49,12 @@ EmptyList: Value = {
     OpenParen WhiteSpace? ClosingParen => Value::empty_list(),
 };
 
-pub Pair: Value = {
+Pair: Value = {
     OpenParen WhiteSpace? <a:Item> WhiteSpace Dot WhiteSpace <b:Item> WhiteSpace? ClosingParen
     => Value::new_pair(a, b),
 };
 
-pub List: Value = {
+List: Value = {
     EmptyList,
     OpenParen WhiteSpace? <v:(Item WhiteSpace)*> <last:Item> WhiteSpace? ClosingParen => {
         let values: Vec<Value> = v.into_iter().map(|(v, _)| v).chain(iter::once(last)).collect();
@@ -62,7 +62,7 @@ pub List: Value = {
     },
 };
 
-pub Item: Value = {
+Item: Value = {
     Quote <Item> => Value::new_list(&[Value::new_symbol("quote"), <>]),
     Char,
     Integer,
@@ -70,4 +70,8 @@ pub Item: Value = {
     String,
     Pair,
     List,
+};
+
+pub TopLevelItem: Value = {
+    WhiteSpace? <Item> WhiteSpace?
 };

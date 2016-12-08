@@ -33,21 +33,8 @@ fn unescape_string(input: &str) -> String {
     s
 }
 
-macro_rules! create_parser {
-    ($parser:ident) => (
-
-        fn $parser<'input>(input: &'input str)
-        -> Result<Value, ::lalrpop_util::ParseError<usize, lexer::Token<'input>, lexer::Error>> {
-            let tokenizer = lexer::Tokenizer::new(input);
-            parser::$parser(input, tokenizer)
-        }
-    );
+fn parse<'input>(input: &'input str)
+-> Result<Value, ::lalrpop_util::ParseError<usize, lexer::Token<'input>, lexer::Error>> {
+    let tokenizer = lexer::Tokenizer::new(input);
+    parser::parse_TopLevelItem(input, tokenizer)
 }
-
-create_parser!(parse_Char);
-create_parser!(parse_Integer);
-create_parser!(parse_Symbol);
-create_parser!(parse_String);
-create_parser!(parse_Pair);
-create_parser!(parse_List);
-create_parser!(parse_Item);

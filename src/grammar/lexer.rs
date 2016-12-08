@@ -83,26 +83,29 @@ impl<'input> Tokenizer<'input> {
 
     fn parse_char(&mut self, start: usize) -> Option<Result<Spanned<Token<'input>>, Error>> {
         let s = self.eat_until(start, |c| end_of_item(c) && c != ')');
-
-        if s.len() <= 2 {
-            Tokenizer::token_at(start..start+s.len(), Token::Symbol(s))
-        } else if s.len() == 3 {
-            let c = s.chars().skip(2).next().unwrap();
-            if valid_char(c) {
-                Tokenizer::token_at(start..start+4, Token::Char(c))
-            } else {
-                Some(Err(Error::UnexpectedToken(start+2)))
-            }
-        } else if s.len() == 4 {
-            let token = match s {
-                r"#\\n" => Token::Char('\n'),
-                r"#\\t" => Token::Char('\t'),
-                r"#\\s" => Token::Char(' '),
-                _ => return Some(Err(Error::UnexpectedToken(start+2))),
-            };
-            Tokenizer::token_at(start+2..start+4, token)
-        } else {
-            Some(Err(Error::UnexpectedToken(start+2)))
+        match s.len() {
+            l @ 1...2 => {
+                let r = start..start+l;
+                Tokenizer::token_at(r.clone(), Token::Symbol(&self.text[r]))
+            },
+            3 => {
+                let c = s.chars().skip(2).next().unwrap();
+                if valid_char(c) {
+                    Tokenizer::token_at(start..start+4, Token::Char(c))
+                } else {
+                    Some(Err(Error::UnexpectedToken(start+2)))
+                }
+            },
+            4 => {
+                let token = match s {
+                    r"#\\n" => Token::Char('\n'),
+                    r"#\\t" => Token::Char('\t'),
+                    r"#\\s" => Token::Char(' '),
+                    _ => return Some(Err(Error::UnexpectedToken(start+2))),
+                };
+                Tokenizer::token_at(start+2..start+4, token)
+            },
+            _ => Some(Err(Error::UnexpectedToken(start+2))),
         }
     }
 
