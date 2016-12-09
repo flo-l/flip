@@ -33,7 +33,7 @@ fn unescape_string(input: &str) -> String {
     s
 }
 
-fn parse<'input>(input: &'input str)
+pub fn parse<'input>(input: &'input str)
 -> Result<Value, ::lalrpop_util::ParseError<usize, lexer::Token<'input>, lexer::Error>> {
     let tokenizer = lexer::Tokenizer::new(input);
     parser::parse_TopLevelItem(input, tokenizer)

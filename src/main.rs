@@ -10,7 +10,6 @@ extern crate lalrpop_util;
 
 mod cli;
 mod grammar;
-mod parser;
 mod value;
 mod interpreter;
 mod repl;
@@ -20,9 +19,10 @@ mod native;
 use std::io::Read;
 
 fn main() {
-    if let Some(file) = cli::get_args() {
-        let input: Vec<u8> = file.bytes().filter_map(Result::ok).collect();
-        let parsed = parser::parse(&input).unwrap();
+    if let Some(mut file) = cli::get_args() {
+        let mut input = String::new();
+        file.read_to_string(&mut input).expect("Couldn't read file");
+        let parsed = grammar::parse(&input).unwrap();
         let mut interpreter = interpreter::Interpreter::new();
         println!("{:?}", interpreter.evaluate(&parsed));
     } else {

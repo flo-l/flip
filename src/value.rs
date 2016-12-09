@@ -5,8 +5,8 @@ use std::mem;
 use std::char;
 use std::hash::{Hash, Hasher};
 use siphasher::sip::SipHasher24 as SipHasher;
-use super::interpreter::Interpreter;
-use super::parser;
+use ::interpreter::Interpreter;
+use ::grammar;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -133,12 +133,8 @@ impl Value {
 
     pub fn from_string_to_number(a: &Value) -> Value {
         let s = check_type!(Value::get_string, a, "string");
-        let number = parser::integer(s.as_bytes());
-        if number.is_done() {
-            number.unwrap().1
-        } else {
-            panic!("{} is no valid integer", s)
-        }
+        let number = grammar::parse(s);
+        number.unwrap_or_else(|_| panic!("{} is no valid integer", s))
     }
 
     pub fn from_string_to_symbol(a: &Value) -> Value {

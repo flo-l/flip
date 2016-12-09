@@ -3,7 +3,7 @@ use std::iter;
 use std::collections::btree_set::BTreeSet;
 use std::mem;
 use super::interpreter;
-use super::parser;
+use super::grammar;
 use super::scope::SymbolIterator;
 
 pub struct Repl {}
@@ -34,10 +34,10 @@ impl Repl {
             if line == quit { return }
             rl.add_history_entry(&line);
 
-            let parsed = parser::parse(line.as_bytes());
+            let parsed = grammar::parse(&line);
             match parsed {
                 Ok(value) => println!("=> {}", interpreter.evaluate(&value)),
-                Err(err)  => println!("{}", err),
+                Err(err)  => println!("{:?}", err),
             }
         }
     }
