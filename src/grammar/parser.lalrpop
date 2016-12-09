@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::iter;
 use ::value::Value;
-use ::grammar::unescape_string;
+use ::grammar::lexer::unescape_string;
 use super::lexer::{Token, Error};
 
 grammar<'input>(text: &'input str);
