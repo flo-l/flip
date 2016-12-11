@@ -1,5 +1,4 @@
 #[macro_use] extern crate clap;
-#[macro_use] extern crate nom;
 
 //TODO remove this (also cargo.toml)
 extern crate regex;
