@@ -51,7 +51,7 @@ fn print_line_with_pos(input: &str, start: usize, mut end: usize) -> String {
         &input[line_start..line_end],
         "", "", span,
         ws_pipe = line_no.to_string().len(),
-        ws_err = input[line_start..start].len(),
+        ws_err = input[line_start..start].chars().count(),
     )
 }
 
@@ -101,20 +101,31 @@ fn unexpected_eof(input: &str) -> String {
 }
 
 fn tokenizer_error(input: &str, err: &Error) -> String {
-    let err_str = match err {
-        &Error::InvalidCharacter(c) => format!("invalid character: {} is not ASCII", c),
-        &Error::UnexpectedEof => format!("unexpected EOF{}", print_hint_msg("missing closing \", did you forget to terminate a string literal?")),
+    let strs = match err {
+        &Error::InvalidCharacter(pos) => {
+            // find char at position
+            let c = input[pos..].chars().next().expect("internal error");
+            vec![
+                print_line_with_pos(input, pos, pos),
+                print_error_msg(&format!("invalid character: {} is not ASCII", c)),
+                "".into(),
+            ]
+        },
+        &Error::UnexpectedEof => vec![
+            print_line_with_pos(input, input.len(), input.len()),
+            print_error_msg(&format!("unexpected EOF\n")),
+            print_hint_msg("missing closing \", did you forget to terminate a string literal?")
+        ],
         &Error::UnexpectedToken(pos) => {
             // find char at position
             let c = input[pos..].chars().next().expect("internal error");
-            format!("unexpected token: '{}'", c)
+            vec![
+                print_error_msg(&format!("unexpected token: '{}'", c)),
+            ]
         },
     };
 
-    concat_strings(&[
-        print_line_with_pos(input, input.len(), input.len()),
-        err_str,
-    ])
+    concat_strings(&strs)
 }
 
 fn print_error_msg(msg: &str) -> String {

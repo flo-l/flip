@@ -5,7 +5,6 @@ use super::parse;
 use super::lexer::{Token, Error};
 
 const EOF: usize = usize::MAX;
-const INVALID_CHAR: usize = usize::MAX-1;
 
 fn unrecognized(x: &ParseError<usize, Token, Error>) -> usize {
     if let &ParseError::UnrecognizedToken{expected: _, token: Some((pos, _, _))} = x {
@@ -29,7 +28,7 @@ fn whatever(x: &ParseError<usize, Token, Error>) -> usize {
         &ParseError::UnrecognizedToken{expected: _, token: Some((pos, _, _))} => pos,
         &ParseError::User{error: Error::UnexpectedToken(x)} => x,
         &ParseError::User{error: Error::UnexpectedEof} => EOF,
-        &ParseError::User{error: Error::InvalidCharacter(_)} => INVALID_CHAR,
+        &ParseError::User{error: Error::InvalidCharacter(x)} => x,
         x => panic!("got: {:?}", x),
     }
 }
@@ -193,7 +192,7 @@ fn string() {
     expect_str_ok!(r#"Hi there: \" \\ \n \t"#, "Hi there: \" \\ \n \t");
 
     expect_error!(parse, "\"", EOF);
-    expect_error!(parse, "\"❤\"", INVALID_CHAR); // non ascii
+    expect_error!(parse, "\"❤\"", 1); // non ascii
 }
 
 #[test]

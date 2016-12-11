@@ -35,7 +35,7 @@ pub type Spanned<T> = (usize, T, usize);
 
 #[derive(Debug)]
 pub enum Error {
-    InvalidCharacter(char),
+    InvalidCharacter(usize),
     UnexpectedToken(usize),
     UnexpectedEof,
 }
@@ -83,7 +83,7 @@ impl<'input> Tokenizer<'input> {
 
     fn parse_char(&mut self, start: usize) -> Option<Result<Spanned<Token<'input>>, Error>> {
         let s = self.eat_until(start, |c| end_of_item(c) && c != ')');
-        match s.len() {
+        match s.chars().count() {
             l @ 1...2 => {
                 let r = start..start+l;
                 Tokenizer::token_at(r.clone(), Token::Symbol(&self.text[r]))
@@ -143,9 +143,9 @@ impl<'input> Tokenizer<'input> {
                         str_len += substr.len();
                         let s = &self.text[start..start+str_len];
                         // check for ascii only strings (for now)
-                        for c in s.chars() {
+                        for (pos, c) in s.char_indices() {
                             if !c.is_ascii() {
-                                return Some(Err(Error::InvalidCharacter(c)));
+                                return Some(Err(Error::InvalidCharacter(start + pos)));
                             }
                         }
                         return Tokenizer::token_at(start..start+str_len, Token::String(s));
@@ -218,7 +218,7 @@ fn valid_char(x: char) -> bool {
 #[allow(dead_code)]
 pub fn unescape_string(input: &str) -> String {
     let mut chars = input.chars();
-    let mut s = String::with_capacity(input.len());
+    let mut s = String::with_capacity(input.chars().count());
 
     while let Some(c) = chars.next() {
         if c == '\\' {

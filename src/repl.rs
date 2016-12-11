@@ -33,6 +33,7 @@ impl Repl {
             if line == quit { return }
             rl.add_history_entry(&line);
 
+            // strip \n at the end
             let parsed = grammar::parse(&line);
             match parsed {
                 Ok(value) => println!("=> {}", interpreter.evaluate(&value)),
