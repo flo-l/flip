@@ -3,6 +3,7 @@ mod tests;
 
 mod parser;
 mod lexer;
+pub mod error_printing;
 
 use ::value::Value;
 

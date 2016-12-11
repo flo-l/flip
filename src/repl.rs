@@ -2,7 +2,7 @@ use rustyline;
 use std::iter;
 use std::collections::btree_set::BTreeSet;
 use super::interpreter;
-use super::grammar;
+use super::grammar::{self, error_printing};
 use super::scope::SymbolIterator;
 
 pub struct Repl {}
@@ -36,7 +36,7 @@ impl Repl {
             let parsed = grammar::parse(&line);
             match parsed {
                 Ok(value) => println!("=> {}", interpreter.evaluate(&value)),
-                Err(err)  => println!("{:?}", err),
+                Err(ref err)  => println!("{}", error_printing::create_error_message(&line, err)),
             }
         }
     }
