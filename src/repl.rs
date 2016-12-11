@@ -1,7 +1,6 @@
-use rustyline::{self, line_buffer};
+use rustyline;
 use std::iter;
 use std::collections::btree_set::BTreeSet;
-use std::mem;
 use super::interpreter;
 use super::grammar;
 use super::scope::SymbolIterator;
@@ -40,22 +39,6 @@ impl Repl {
                 Err(err)  => println!("{:?}", err),
             }
         }
-    }
-}
-
-struct ParensCloser {}
-
-impl rustyline::completion::Completer for ParensCloser {
-    fn complete(&self, line: &str, _: usize) -> rustyline::Result<(usize, Vec<String>)> {
-        let unclosed_parens = line.chars()
-        .fold(0, |n, c| if c == '(' { n + 1 } else if c == ')' { n - 1 } else { n });
-        let missing_parens: String = iter::repeat(')').take(unclosed_parens).collect();
-        Result::Ok((line.len(), vec![missing_parens]))
-    }
-
-    fn update(&self, line: &mut line_buffer::LineBuffer, _: usize, elected: &str) {
-        let len = line.len();
-        line.replace(len, len, elected);
     }
 }
 

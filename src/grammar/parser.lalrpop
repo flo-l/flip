@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use std::iter;
 use ::value::Value;
 use ::grammar::lexer::unescape_string;
