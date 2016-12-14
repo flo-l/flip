@@ -10,8 +10,14 @@ macro_rules! check_arity {
     ($name:expr, $len:expr, $lo:expr, $hi:expr) => ({
         let len = $len as u32;
         if len < $lo || len > $hi {
-            let s = Value::new_string(format!("arity mismatch for {}: expected: {}..{}, got: {}", $name, $lo, $hi, len));
-            return Value::new_condition(s);
+            raise_condition!(format!("arity mismatch for {}: expected: {}..{}, got: {}", $name, $lo, $hi, len));
+        }
+    });
+
+    ($name:expr, $len:expr, min => $min:expr) => ({
+        let len = $len as u32;
+        if len < $min {
+            raise_condition!(format!("arity mismatch for {}: expected: {}.., got: {}", $name, $min, len));
         }
     });
 }
@@ -102,6 +108,12 @@ macro_rules! eval_args {
         }
     )
 }
+
+// Polymorphic equality
+eval_args!(fn eq_(args: &mut [Value]) -> Value {
+    check_arity!("eq?", args.len(), min => 2);
+    Value::new_bool(args.windows(2).all(|window| window[0] == window[1]))
+});
 
 // Type checking
 macro_rules! type_checker {

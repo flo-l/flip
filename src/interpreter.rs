@@ -20,6 +20,7 @@ impl Interpreter {
         self.current_scope.add_symbol("define", Value::new_native_proc(native::define));
         self.current_scope.add_symbol("set!", Value::new_native_proc(native::set));
         self.current_scope.add_symbol("if", Value::new_native_proc(native::if_));
+        self.current_scope.add_symbol("eq?", Value::new_native_proc(native::eq_));
 
         self.current_scope.add_symbol("null?", Value::new_native_proc(native::null_));
         self.current_scope.add_symbol("boolean?", Value::new_native_proc(native::boolean_));
