@@ -1,62 +1,92 @@
 use std::ops::{Add, Sub, Mul, Div, Rem};
-use super::value::Value;
-use super::interpreter::Interpreter;
-use super::scope::SymbolIterator;
+use ::value::Value;
+use ::interpreter::Interpreter;
+use ::scope::SymbolIterator;
+
+macro_rules! check_arity {
+    ($name:expr, $len:expr, $exact:expr)
+    => (check_arity!($name, $len, $exact, $exact));
+
+    ($name:expr, $len:expr, $lo:expr, $hi:expr) => ({
+        let len = $len as u32;
+        if len < $lo || len > $hi {
+            let s = Value::new_string(format!("arity mismatch for {}: expected: {}..{}, got: {}", $name, $lo, $hi, len));
+            return Value::new_condition(s);
+        }
+    });
+}
+
+macro_rules! try_unwrap_type {
+    ($fn_name:expr, $type_name:expr, $unwrap_fn:path, $t:expr) => ({
+        match $unwrap_fn($t) {
+            Some(x) => x,
+            None => {
+                let s = format!("{} expected {}, got: {}", $fn_name, $type_name, $t);
+                return Value::new_condition(Value::new_string(s));
+            }
+        }
+    });
+}
+
+macro_rules! new_condition {
+    ($msg:expr) => (
+        Value::new_condition(Value::new_string($msg))
+    )
+}
+
+macro_rules! raise_condition {
+    ($msg:expr) => (
+        return new_condition!($msg);
+    )
+}
+
+macro_rules! assert_or_condition {
+    ($b:expr, $msg:expr) => ({
+        if !$b {
+            raise_condition!($msg)
+        }
+    })
+}
 
 pub fn quote(_: &mut Interpreter, args: &mut [Value]) -> Value {
-    if args.len() != 1 {
-        panic!("quote accepts exactly 1 argument");
-    }
+    check_arity!("quote", args.len(), 1);
     args[0].clone()
 }
 
 pub fn define(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    if args.len() != 2 {
-        panic!("define accepts exactly 2 arguments");
-    }
+    check_arity!("define", args.len(), 2);
 
-    if let Some(x) = args[0].get_symbol() {
-        let item = interpreter.evaluate(&args[1]);
-        interpreter.current_scope.add_symbol(&*x, item);
-        args[0].clone()
-    } else {
-        panic!("first arg of define has to be an ident, got: {}", args[0]);
-    }
+    let s = try_unwrap_type!("define", "symbol", Value::get_symbol, &args[0]);
+    let item = interpreter.evaluate(&args[1]);
+    interpreter.current_scope.add_symbol(s, item);
+    args[0].clone()
 }
 
 pub fn set(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    if args.len() != 2 {
-        panic!("set! accepts exactly 2 arguments");
-    }
+    check_arity!("set!", args.len(), 2);
 
-    if let Some(x) = args[0].get_symbol() {
-        if interpreter.current_scope.lookup_symbol_string(x).is_some() {
-            let item = interpreter.evaluate(&args[1]);
-            interpreter.current_scope.add_symbol(x, item);
-            args[0].clone()
-        } else {
-            panic!("ident undefined: {}", args[0]);
-        }
-    } else {
-        panic!("first arg of set! has to be an ident, got: {}", args[0]);
-    }
+    let s = try_unwrap_type!("set!", "symbol", Value::get_symbol, &args[0]);
+    assert_or_condition!(
+        interpreter.current_scope.lookup_symbol_string(s).is_some(),
+        format!("set!: unknown identifier {}", args[0])
+    );
+    let item = interpreter.evaluate(&args[1]);
+    interpreter.current_scope.add_symbol(s, item);
+    args[0].clone()
 }
 
 pub fn if_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    if args.len() != 3 {
-        panic!("if accepts exactly 3 arguments");
-    }
+    check_arity!("if", args.len(), 3);
 
     let condition = interpreter.evaluate(&args[0]);
     if let Some(b) = condition.get_bool() {
-
         if b {
             interpreter.evaluate(&args[1])
         } else {
             interpreter.evaluate(&args[2])
         }
     } else {
-        panic!("first arg of if has to evaluate to bool, got: {}", condition);
+        raise_condition!(format!("if: argument mismatch: expected bool, got: {}", condition));
     }
 }
 
@@ -77,9 +107,7 @@ macro_rules! eval_args {
 macro_rules! type_checker {
     ($func:ident, $lisp_name:expr, $checking_fn:ident) =>
     (eval_args!(fn $func(args: &mut [Value]) -> Value {
-        if args.len() != 1 {
-            panic!("{} accepts exactly 1 argument", $lisp_name);
-        }
+        check_arity!($lisp_name, args.len(), 1);
         Value::new_bool(args[0].$checking_fn().is_some())
     }););
 }
@@ -97,9 +125,7 @@ type_checker!(procedure_, "procedure?", get_fn_ptr);
 macro_rules! type_conversion {
     ($func:ident, $lisp_name:expr, $conversion_fn:ident) =>
     (eval_args!(fn $func(args: &mut [Value]) -> Value {
-        if args.len() != 1 {
-            panic!("{} accepts exactly 1 argument", $lisp_name);
-        }
+        check_arity!($lisp_name, args.len(), 1);
         Value::$conversion_fn(&args[0])
     }););
 }
@@ -115,17 +141,19 @@ type_conversion!(string_symbol, "string->symbol", from_string_to_symbol);
 macro_rules! arithmetic_operator {
     ($func:ident, $operator:path, $default:expr) =>
     (eval_args!(fn $func(args: &mut [Value]) -> Value {
-
         let mut res = if args.len() < 2 {
             $default as i64
         } else {
-            args[0].get_integer().unwrap_or_else(|| panic!("expected integer, got: {}", &args[0]))
+            match args[0].get_integer() {
+                Some(i) => i,
+                None => raise_condition!(format!("expected integer, got: {}", &args[0]))
+            }
         };
         for x in args[1..].iter() {
             if let Some(i) = x.get_integer() {
                 res = $operator(res, i);
             } else {
-                panic!("expected intege, got: {}", x);
+                raise_condition!(format!("expected integer, got: {}", x))
             }
         }
         Value::new_integer(res)
@@ -142,18 +170,20 @@ arithmetic_operator!(remainder, Rem::rem, 1);
 macro_rules! comparison_operator {
     ($func:ident, $lisp_name:expr, $operator:path) =>
     (eval_args!(fn $func(args: &mut [Value]) -> Value {
-        if args.len() < 1 {
-            panic!("{} accepts 1 or more arguments", $lisp_name);
-        }
+        check_arity!($lisp_name, args.len(), 1);
 
         let mut res = true;
-        let compared_element = &args[0].get_integer()
-        .unwrap_or_else(|| panic!("expected integer, found {}", &args[0]));
+        let compared_element = match args[0].get_integer() {
+            Some(i) => i,
+            None => raise_condition!(format!("expected integer, got: {}", &args[0]))
+        };
 
         for x in &args[1..] {
-            let num = x.get_integer()
-            .unwrap_or_else(|| panic!("expected integer, found {}", &args[0]));
-            res = res && $operator(compared_element, &num)
+            let num = match x.get_integer() {
+                Some(i) => i,
+                None => raise_condition!(format!("expected integer, got: {}", x))
+            };
+            res = res && $operator(&compared_element, &num);
         }
         Value::new_bool(res)
     }););
@@ -167,34 +197,27 @@ comparison_operator!(ge, ">=", PartialOrd::ge);
 
 // List operations:
 eval_args!(fn car(args: &mut [Value]) -> Value {
-    if args.len() != 1 {
-        panic!("car accepts exactly 1 argument");
-    }
+    check_arity!("car", args.len(), 1);
 
     if let Some((a, _)) = args[0].get_pair() {
         a.clone()
     } else {
-        panic!("expected pair, got {}", &args[0])
+        raise_condition!(format!("expected pair, got {}", &args[0]));
     }
 });
 
 eval_args!(fn cdr(args: &mut [Value]) -> Value {
-    if args.len() != 1 {
-        panic!("cdr accepts exactly 1 argument");
-    }
+    check_arity!("cdr", args.len(), 1);
 
     if let Some((_, b)) = args[0].get_pair() {
         b.clone()
     } else {
-        panic!("expected pair, got {}", &args[0])
+        raise_condition!(format!("expected pair, got {}", &args[0]));
     }
 });
 
 eval_args!(fn cons(args: &mut [Value]) -> Value {
-    if args.len() != 2 {
-        panic!("cons accepts exactly 2 argument");
-    }
-
+    check_arity!("cons", args.len(), 2);
     Value::new_pair(args[0].clone(), args[1].clone())
 });
 
@@ -203,9 +226,7 @@ eval_args!(fn list(args: &mut [Value]) -> Value {
 });
 
 pub fn set_car_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    if args.len() != 2 {
-        panic!("set_car! accepts exactly 2 argument");
-    }
+    check_arity!("set-car!", args.len(), 2);
 
     let (f, elem) = args.split_at(1);
     let (f, elem) = (&f[0], &elem[0]);
@@ -216,17 +237,16 @@ pub fn set_car_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
             let quoted = Value::new_list(&[Value::new_symbol("quote"), new_pair]);
             define(interpreter, &mut [f.clone(), quoted])
         } else {
-            panic!("expected pair, got {}", old_pair)
+            raise_condition!(format!("expected pair, got {}", old_pair));
         }
     } else {
-        panic!("expected symbol, got {}", f)
+        raise_condition!(format!("expected symbol, got {}", f));
     }
 }
 
 pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    if args.len() != 2 {
-        panic!("set_cdr! accepts exactly 2 argument");
-    }
+    check_arity!("set-cdr!", args.len(), 2);
+
 
     let (f, elem) = args.split_at(1);
     let (f, elem) = (&f[0], &elem[0]);
@@ -237,17 +257,15 @@ pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
             let quoted = Value::new_list(&[Value::new_symbol("quote"), new_pair]);
             define(interpreter, &mut [f.clone(), quoted])
         } else {
-            panic!("expected pair, got {}", old_pair)
+            raise_condition!(format!("expected pair, got {}", old_pair))
         }
     } else {
-        panic!("expected symbol, got {}", f)
+        raise_condition!(format!("expected symbol, got {}", f));
     }
 }
 
 pub fn symbol_space(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    if args.len() != 0 {
-        panic!("symbol-space accepts no arguments");
-    }
+    check_arity!("symbol-space", args.len(), 0);
 
     let symbols: Vec<Value> = SymbolIterator::new(&interpreter.current_scope)
     .map(|(_, &(ref s, _))| Value::new_symbol(s.clone()))

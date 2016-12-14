@@ -16,8 +16,10 @@ pub struct Value {
 macro_rules! check_type {
     ($unwrap_fn:path, $e:expr, $type_name:expr) =>
     ({
-        let expected = $unwrap_fn($e);
-        expected.unwrap_or_else(|| panic!("expected {}, got {:?}", $type_name, $e))
+        match $unwrap_fn($e) {
+            Some(x) => x,
+            None => return Value::new_condition(Value::new_string(format!("expected {}, got {:?}", $type_name, $e))),
+        }
     });
 }
 
@@ -32,6 +34,7 @@ impl Value {
     pub fn new_symbol<'a, T: 'a + Into<Cow<'a, str>>>(s: T) -> Self { Self::new_with(ValueData::Symbol(s.into().into_owned())) }
     pub fn new_string<'a, T: 'a + Into<Cow<'a, str>>>(x: T) -> Self { Self::new_with(ValueData::String(x.into().into_owned())) }
     pub fn new_pair(a: Value, b: Value) -> Self { Self::new_with(ValueData::Pair(a,b)) }
+    pub fn new_condition(x: Value) -> Self { Self::new_with(ValueData::Condition(x)) }
     pub fn empty_list() -> Self { Self::new_with(ValueData::EmptyList) }
     pub fn new_native_proc(f: fn(&mut Interpreter, &mut [Value]) -> Value) -> Self {
         let raw: *const () = f as *const ();
@@ -104,6 +107,13 @@ impl Value {
         }
     }
 
+    pub fn get_condition(&self) -> Option<&Value> {
+        match self.data() {
+            &ValueData::Condition(ref x) => Some(x),
+            _ => None,
+        }
+    }
+
     pub fn get_fn_ptr(&self) -> Option<fn(&mut Interpreter, &mut [Value]) -> Value> {
         match self.data() {
             &ValueData::NativeProc(f) => Some(unsafe { mem::transmute(f) }),
@@ -120,7 +130,7 @@ impl Value {
         let i = check_type!(Value::get_integer, a, "integer");
         let c = char::from_u32(i as u32);
         if i > char::MAX as i64 || c.is_none() {
-            panic!("{} is no valid char", i);
+            return Value::new_condition(Value::new_string(format!("{} is no valid char", i)))
         } else {
             Value::new_char(c.unwrap())
         }
@@ -133,8 +143,10 @@ impl Value {
 
     pub fn from_string_to_number(a: &Value) -> Value {
         let s = check_type!(Value::get_string, a, "string");
-        let number = grammar::parse(s);
-        number.unwrap_or_else(|_| panic!("{} is no valid integer", s))
+        match grammar::parse(s) {
+            Ok(ref n) if n.get_integer().is_some() => n.clone(),
+            _ => return Value::new_condition(Value::new_string(format!("{} is no valid integer", s)))
+        }
     }
 
     pub fn from_string_to_symbol(a: &Value) -> Value {
@@ -204,6 +216,7 @@ enum ValueData {
     String(String),
     Pair(Value, Value),
     EmptyList,
+    Condition(Value),
     NativeProc(*const ()),
 }
 
@@ -223,6 +236,7 @@ impl fmt::Display for ValueData {
                 }
                 res.and(write!(f, ")"))
             },
+            &ValueData::Condition(ref x) => write!(f, "[CONDITION: {:?}]", x),
             &ValueData::Pair(ref a, ref b) => write!(f, "({} . {})", a, b),
             &ValueData::EmptyList => write!(f, "()"),
             &ValueData::NativeProc(x) => write!(f, "[NATIVE_PROC: {:?}]", x),

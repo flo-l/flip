@@ -59,40 +59,36 @@ impl Interpreter {
         self.current_scope.add_symbol("symbol-space", Value::new_native_proc(native::symbol_space));
     }
 
-/*
-    pub fn lookup_symbol(ident: &str) -> Value {
-        if let Some(val) = self.scopes.last().lookup_symbol(ident) {
-            val
-        } else {
-            println!("Searched Ident: {:?}", scope::intern_symbol(ident));
-            println!("Known Idents: ");
-            for x in &self.scopes {
-                for (hash, value) in &x.idents {
-                    println!("({:?}) => {:?}", hash, value);
-                }
-            }
-            panic!("Ident: {:?} not found.", ident);
-        }
-    }*/
-
     pub fn evaluate(&mut self, value: &Value) -> Value {
+        let res: Value;
         if value.is_list() {
             let mut list: Vec<Value> = ListIter::new(value).cloned().collect();
-            let (func, mut args) = list.split_at_mut(1);
-            let func = if func.len() == 1 { self.evaluate(&func[0]) } else { panic!("tried to evaluate ()") };
+            if list.len() > 0 {
+                let (func, mut args) = list.split_at_mut(1);
+                let func = self.evaluate(&func[0]);
 
-            if let Some(f) = func.get_fn_ptr() {
-                f(self, &mut args)
+                if let Some(f) = func.get_fn_ptr() {
+                    res = f(self, &mut args)
+                } else {
+                    res = Value::new_condition(Value::new_string(format!("tried to call {}, which is not possible", func)));
+                }
             } else {
-                panic!("tried to call {}, which is not possible", func)
-            }
+                res = Value::new_condition(Value::new_string(format!("tried to evaluate ()")));
+            };
         } else if let Some(symbol) = value.get_symbol() {
-            self.current_scope
+            res = self.current_scope
             .lookup_symbol_string(symbol)
             .map(|&(_, ref value)| value.clone())
-            .unwrap_or_else(|| panic!("undefined ident: {}", value))
+            .unwrap_or(Value::new_condition(Value::new_string(format!("undefined ident: {}", value))));
         } else {
-            value.clone()
+            res = value.clone();
         }
+
+        // TODO handle condition properly
+        match res.get_condition() {
+            Some(x) => panic!("{}", x),
+            _ => (),
+        };
+        res
     }
 }
