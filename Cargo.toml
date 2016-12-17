@@ -8,7 +8,6 @@ build = "build.rs" # LALRPOP preprocessing
 clap = "2"
 siphasher = "0.1.2"
 rustyline = "1"
-regex = "0.1"
 
 # Add a dependency on the LALRPOP runtime library:
 [dependencies.lalrpop-util]
