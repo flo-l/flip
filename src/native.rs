@@ -172,7 +172,12 @@ type_checker!(integer_, "integer?", get_integer);
 type_checker!(char_, "char?", get_char);
 type_checker!(string_, "string?", get_string);
 type_checker!(pair_, "pair?", get_pair);
-type_checker!(procedure_, "procedure?", get_native_fn_ptr);
+
+eval_args!(fn procedure_(args: &mut [Value]) -> Value {
+    check_arity!("procedure?", args.len(), 1);
+    let is_proc = Value::get_native_fn_ptr(&args[0]).is_some() || Value::get_proc(&args[0]).is_some();
+    Value::new_bool(is_proc)
+});
 
 // Type conversions
 macro_rules! type_conversion {
