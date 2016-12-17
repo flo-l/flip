@@ -1,4 +1,4 @@
-My take on implementing a scheme-like language
+My take on implementing a scheme-like language in Rust
 ======================
 
 This is just for fun. The code is opensource, because I was looking for similar projects
