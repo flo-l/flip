@@ -33,35 +33,27 @@ impl Scope {
         }
     }
 
-    pub fn lookup_symbol_with_string(&self, s: &str) -> Option<Value> {
-        let id = intern_symbol(s);
-        self.lookup_symbol(id)
-    }
-
-    pub fn lookup_symbol<'a>(&'a self, id: u64) -> Option<Value> {
+    pub fn lookup_symbol(&self, id: u64) -> Option<Value> {
         for scope_data in self.list.iter().map(RefCell::borrow) {
             match scope_data.lookup_symbol(id) {
-                Some(&(_, ref v)) => return Some(v.clone()),
+                // has to clone because of refcell
+                Some(v) => return Some(v.clone()),
                 None => continue,
             }
         }
         None
     }
 
-    pub fn add_symbol<'a, T: 'a + Into<Cow<'a, str>>>(&mut self, ident: T, value: Value) {
-        let ident = ident.into();
-        let id = intern_symbol(&ident);
+    pub fn add_symbol(&mut self, id: u64, value: Value) {
         self.list.head().expect("internal error: scope without data")
-        .borrow_mut().bindings.insert(id, (ident.into_owned(), value));
+        .borrow_mut().bindings.insert(id, value);
     }
 
-    // horribly inefficient but for now that has to be enough
-    // when symbols become numbers this will be fast again
-    pub fn symbol_strings<'a>(&'a self) -> Vec<String> {
-        let mut symbol_strings: Vec<String> = vec![];
+    pub fn symbol_ids<'a>(&'a self) -> Vec<u64> {
+        let mut symbol_strings: Vec<u64> = vec![];
         for scope in self.list.iter().map(RefCell::borrow) {
-            for string in scope.symbols().map(|&(ref s, _)| s) {
-                symbol_strings.push(string.clone());
+            for id in scope.symbol_ids() {
+                symbol_strings.push(id);
             }
         }
         symbol_strings
@@ -70,7 +62,7 @@ impl Scope {
 
 #[derive(Debug, PartialEq)]
 pub struct ScopeData {
-    bindings: HashMap<u64, (String, Value)>,
+    bindings: HashMap<u64, Value>,
 }
 
 impl ScopeData {
@@ -80,11 +72,11 @@ impl ScopeData {
         }
     }
 
-    fn lookup_symbol(&self, id: u64) -> Option<&(String, Value)> {
+    fn lookup_symbol(&self, id: u64) -> Option<&Value> {
         self.bindings.get(&id)
     }
 
-    fn symbols<'a>(&'a self) -> impl Iterator<Item=&'a (String, Value)> {
-        self.bindings.iter().map(|(_, pair)| pair)
+    fn symbol_ids<'a>(&'a self) -> impl Iterator<Item=u64> + 'a {
+        self.bindings.keys().map(|x| *x)
     }
 }

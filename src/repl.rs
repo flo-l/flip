@@ -1,6 +1,7 @@
 use rustyline;
 use std::iter;
 use std::collections::btree_set::BTreeSet;
+use std::cell::RefCell;
 use ::interpreter;
 use ::grammar::{self, error_printing};
 
@@ -16,7 +17,10 @@ impl Repl {
         let mut interpreter = interpreter::Interpreter::new();
 
         loop {
-            let idents = interpreter.current_scope.symbol_strings();
+            let idents: Vec<String> = interpreter.current_scope.symbol_ids()
+            .into_iter()
+            .filter_map(|id| interpreter.get_interner().lookup(id).map(Into::into))
+            .collect();
 
             let completer = IdentCompleter {
                 break_chars: &break_chars,
@@ -31,7 +35,7 @@ impl Repl {
             rl.add_history_entry(&line);
 
             // strip \n at the end
-            let parsed = grammar::parse(&line);
+            let parsed = grammar::parse(&line, &mut interpreter);
             match parsed {
                 Ok(value) => println!("=> {}", interpreter.evaluate(&value)),
                 Err(ref err)  => println!("{}", error_printing::create_error_message(&line, err)),

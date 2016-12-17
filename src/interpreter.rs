@@ -1,14 +1,17 @@
 use ::value::Value;
 use ::scope::Scope;
 use ::native;
+use ::string_interner::StringInterner;
 
 pub struct Interpreter {
+    string_interner: Option<StringInterner>,
     pub current_scope: Scope,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         let mut interpreter = Interpreter {
+            string_interner: Some(StringInterner::new()),
             current_scope: Scope::new(),
         };
         interpreter.init();
@@ -16,49 +19,49 @@ impl Interpreter {
     }
 
     fn init(&mut self) {
-        self.current_scope.add_symbol("quote", Value::new_native_proc(native::quote));
-        self.current_scope.add_symbol("define", Value::new_native_proc(native::define));
-        self.current_scope.add_symbol("set!", Value::new_native_proc(native::set));
-        self.current_scope.add_symbol("if", Value::new_native_proc(native::if_));
-        self.current_scope.add_symbol("eq?", Value::new_native_proc(native::eq_));
-        self.current_scope.add_symbol("lambda", Value::new_native_proc(native::lambda));
+        self.add_str_to_current_scope("quote", Value::new_native_proc(native::quote));
+        self.add_str_to_current_scope("define", Value::new_native_proc(native::define));
+        self.add_str_to_current_scope("set!", Value::new_native_proc(native::set));
+        self.add_str_to_current_scope("if", Value::new_native_proc(native::if_));
+        self.add_str_to_current_scope("eq?", Value::new_native_proc(native::eq_));
+        self.add_str_to_current_scope("lambda", Value::new_native_proc(native::lambda));
 
-        self.current_scope.add_symbol("null?", Value::new_native_proc(native::null_));
-        self.current_scope.add_symbol("boolean?", Value::new_native_proc(native::boolean_));
-        self.current_scope.add_symbol("symbol?", Value::new_native_proc(native::symbol_));
-        self.current_scope.add_symbol("integer?", Value::new_native_proc(native::integer_));
-        self.current_scope.add_symbol("char?", Value::new_native_proc(native::char_));
-        self.current_scope.add_symbol("string?", Value::new_native_proc(native::string_));
-        self.current_scope.add_symbol("pair?", Value::new_native_proc(native::pair_));
-        self.current_scope.add_symbol("procedure?", Value::new_native_proc(native::procedure_));
+        self.add_str_to_current_scope("null?", Value::new_native_proc(native::null_));
+        self.add_str_to_current_scope("boolean?", Value::new_native_proc(native::boolean_));
+        self.add_str_to_current_scope("symbol?", Value::new_native_proc(native::symbol_));
+        self.add_str_to_current_scope("integer?", Value::new_native_proc(native::integer_));
+        self.add_str_to_current_scope("char?", Value::new_native_proc(native::char_));
+        self.add_str_to_current_scope("string?", Value::new_native_proc(native::string_));
+        self.add_str_to_current_scope("pair?", Value::new_native_proc(native::pair_));
+        self.add_str_to_current_scope("procedure?", Value::new_native_proc(native::procedure_));
 
-        self.current_scope.add_symbol("char->integer", Value::new_native_proc(native::char_integer));
-        self.current_scope.add_symbol("integer->char", Value::new_native_proc(native::integer_char));
-        self.current_scope.add_symbol("number->string", Value::new_native_proc(native::number_string));
-        self.current_scope.add_symbol("string->number", Value::new_native_proc(native::string_number));
-        self.current_scope.add_symbol("symbol->string", Value::new_native_proc(native::symbol_string));
-        self.current_scope.add_symbol("string->symbol", Value::new_native_proc(native::string_symbol));
+        self.add_str_to_current_scope("char->integer", Value::new_native_proc(native::char_integer));
+        self.add_str_to_current_scope("integer->char", Value::new_native_proc(native::integer_char));
+        self.add_str_to_current_scope("number->string", Value::new_native_proc(native::number_string));
+        self.add_str_to_current_scope("string->number", Value::new_native_proc(native::string_number));
+        self.add_str_to_current_scope("symbol->string", Value::new_native_proc(native::symbol_string));
+        self.add_str_to_current_scope("string->symbol", Value::new_native_proc(native::string_symbol));
 
-        self.current_scope.add_symbol("+", Value::new_native_proc(native::plus));
-        self.current_scope.add_symbol("-", Value::new_native_proc(native::minus));
-        self.current_scope.add_symbol("*", Value::new_native_proc(native::multiply));
-        self.current_scope.add_symbol("quotient", Value::new_native_proc(native::quotient));
-        self.current_scope.add_symbol("remainder", Value::new_native_proc(native::remainder));
+        self.add_str_to_current_scope("+", Value::new_native_proc(native::plus));
+        self.add_str_to_current_scope("-", Value::new_native_proc(native::minus));
+        self.add_str_to_current_scope("*", Value::new_native_proc(native::multiply));
+        self.add_str_to_current_scope("quotient", Value::new_native_proc(native::quotient));
+        self.add_str_to_current_scope("remainder", Value::new_native_proc(native::remainder));
 
-        self.current_scope.add_symbol("=", Value::new_native_proc(native::eq));
-        self.current_scope.add_symbol(">", Value::new_native_proc(native::gt));
-        self.current_scope.add_symbol(">=", Value::new_native_proc(native::ge));
-        self.current_scope.add_symbol("<", Value::new_native_proc(native::lt));
-        self.current_scope.add_symbol("<=", Value::new_native_proc(native::le));
+        self.add_str_to_current_scope("=", Value::new_native_proc(native::eq));
+        self.add_str_to_current_scope(">", Value::new_native_proc(native::gt));
+        self.add_str_to_current_scope(">=", Value::new_native_proc(native::ge));
+        self.add_str_to_current_scope("<", Value::new_native_proc(native::lt));
+        self.add_str_to_current_scope("<=", Value::new_native_proc(native::le));
 
-        self.current_scope.add_symbol("cons", Value::new_native_proc(native::cons));
-        self.current_scope.add_symbol("list", Value::new_native_proc(native::list));
-        self.current_scope.add_symbol("car", Value::new_native_proc(native::car));
-        self.current_scope.add_symbol("cdr", Value::new_native_proc(native::cdr));
-        self.current_scope.add_symbol("set-car!", Value::new_native_proc(native::set_car_));
-        self.current_scope.add_symbol("set-cdr!", Value::new_native_proc(native::set_cdr_));
+        self.add_str_to_current_scope("cons", Value::new_native_proc(native::cons));
+        self.add_str_to_current_scope("list", Value::new_native_proc(native::list));
+        self.add_str_to_current_scope("car", Value::new_native_proc(native::car));
+        self.add_str_to_current_scope("cdr", Value::new_native_proc(native::cdr));
+        self.add_str_to_current_scope("set-car!", Value::new_native_proc(native::set_car_));
+        self.add_str_to_current_scope("set-cdr!", Value::new_native_proc(native::set_cdr_));
 
-        self.current_scope.add_symbol("symbol-space", Value::new_native_proc(native::symbol_space));
+        self.add_str_to_current_scope("symbol-space", Value::new_native_proc(native::symbol_space));
     }
 
     pub fn evaluate(&mut self, value: &Value) -> Value {
@@ -80,7 +83,7 @@ impl Interpreter {
             };
         } else if let Some(symbol) = value.get_symbol() {
             res = self.current_scope
-            .lookup_symbol_with_string(symbol)
+            .lookup_symbol(symbol)
             .unwrap_or(Value::new_condition(Value::new_string(format!("undefined ident: {}", value))));
         } else {
             res = value.clone();
@@ -92,5 +95,22 @@ impl Interpreter {
             _ => (),
         };
         res
+    }
+
+    fn add_str_to_current_scope(&mut self, s: &str, value: Value) {
+        let id = self.get_interner().intern(s);
+        self.current_scope.add_symbol(id, value);
+    }
+
+    pub fn get_interner(&mut self) -> &mut StringInterner {
+        self.string_interner.as_mut().expect("internal error: string interner uninitialized")
+    }
+
+    pub fn move_interner(&mut self) -> StringInterner {
+        self.string_interner.take().expect("internal error: string interner uninitialized")
+    }
+
+    pub fn set_interner(&mut self, interner: StringInterner) {
+        self.string_interner = Some(interner);
     }
 }

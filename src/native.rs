@@ -76,7 +76,7 @@ pub fn set(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 
     let s = try_unwrap_type!("set!", "symbol", Value::get_symbol, &args[0]);
     assert_or_condition!(
-        interpreter.current_scope.lookup_symbol_with_string(s).is_some(),
+        interpreter.current_scope.lookup_symbol(s).is_some(),
         format!("set!: unknown identifier {}", args[0])
     );
     let item = interpreter.evaluate(&args[1]);
@@ -111,16 +111,16 @@ pub fn lambda(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         code = args[1].clone();
     } else {
         // type check name
-        try_unwrap_type!("lambda", "list", Value::get_symbol, &args[0]);
-        name = Some(args[0].clone());
+        let name_id = try_unwrap_type!("lambda", "list", Value::get_symbol, &args[0]);
+        name = interpreter.get_interner().lookup(name_id).map(Into::into);
         binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[1]);
         code = args[2].clone();
     }
 
-    let mut bindings: Vec<String> = Vec::with_capacity(binding_list.len());
+    let mut bindings: Vec<u64> = Vec::with_capacity(binding_list.len());
     for v in binding_list.iter() {
         // type check
-        bindings.push(try_unwrap_type!("lambda", "symbol", Value::get_symbol, v).into());
+        bindings.push(try_unwrap_type!("lambda", "symbol", Value::get_symbol, v));
     }
 
     Value::new_proc(name, interpreter.current_scope.clone(), bindings, code)
@@ -176,8 +176,25 @@ type_conversion!(char_integer, "char->integer", from_char_to_integer);
 type_conversion!(integer_char, "integer->char", from_integer_to_char);
 type_conversion!(number_string, "number->string", from_number_to_string);
 type_conversion!(string_number, "string->number", from_string_to_number);
-type_conversion!(symbol_string, "symbol->string", from_symbol_to_string);
-type_conversion!(string_symbol, "string->symbol", from_string_to_symbol);
+
+pub fn symbol_string(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    check_arity!("symbol->string", args.len(), 1);
+    let evaled = interpreter.evaluate(&args[0]);
+    let id = try_unwrap_type!("symbol->string", "symbol", Value::get_symbol, &evaled);
+    if let Some(string) = interpreter.get_interner().lookup(id) {
+        Value::new_string(string)
+    } else {
+        raise_condition!("internal error: invalid symbol")
+    }
+}
+
+pub fn string_symbol(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    check_arity!("string->symbol", args.len(), 1);
+    let evaled = interpreter.evaluate(&args[0]);
+    let string = try_unwrap_type!("string->symbol", "string", Value::get_string, &evaled);
+    let id = interpreter.get_interner().intern(string);
+    Value::new_symbol(id)
+}
 
 // Arithmetic operators
 macro_rules! arithmetic_operator {
@@ -276,7 +293,8 @@ pub fn set_car_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         let old_pair = interpreter.evaluate(f);
         if let Some((_, b)) = old_pair.get_pair() {
             let new_pair = Value::new_pair(elem.clone(), b.clone());
-            let quoted = Value::new_list(&[Value::new_symbol("quote"), new_pair]);
+            let quote_id = interpreter.get_interner().intern("quote");
+            let quoted = Value::new_list(&[Value::new_symbol(quote_id), new_pair]);
             define(interpreter, &mut [f.clone(), quoted])
         } else {
             raise_condition!(format!("expected pair, got {}", old_pair));
@@ -289,14 +307,14 @@ pub fn set_car_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("set-cdr!", args.len(), 2);
 
-
     let (f, elem) = args.split_at(1);
     let (f, elem) = (&f[0], &elem[0]);
     if f.get_symbol().is_some() {
         let old_pair = interpreter.evaluate(f);
         if let Some((a, _)) = old_pair.get_pair() {
             let new_pair = Value::new_pair(a.clone(), elem.clone());
-            let quoted = Value::new_list(&[Value::new_symbol("quote"), new_pair]);
+            let quote_id = interpreter.get_interner().intern("quote");
+            let quoted = Value::new_list(&[Value::new_symbol(quote_id), new_pair]);
             define(interpreter, &mut [f.clone(), quoted])
         } else {
             raise_condition!(format!("expected pair, got {}", old_pair))
@@ -309,7 +327,7 @@ pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 pub fn symbol_space(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("symbol-space", args.len(), 0);
 
-    let symbols: Vec<Value> = interpreter.current_scope.symbol_strings()
+    let symbols: Vec<Value> = interpreter.current_scope.symbol_ids()
     .into_iter()
     .map(|s| Value::new_symbol(s))
     .collect();

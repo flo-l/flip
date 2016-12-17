@@ -8,6 +8,7 @@ use siphasher::sip::SipHasher24 as SipHasher;
 use ::interpreter::Interpreter;
 use ::grammar;
 use ::scope::Scope;
+use ::string_interner::StringInterner;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -32,7 +33,7 @@ impl Value {
     pub fn new_bool(x: bool) -> Self { Self::new_with(ValueData::Bool(x)) }
     pub fn new_char(x: char) -> Self { Self::new_with(ValueData::Char(x)) }
     pub fn new_integer(x: i64) -> Self { Self::new_with(ValueData::Integer(x)) }
-    pub fn new_symbol<'a, T: 'a + Into<Cow<'a, str>>>(s: T) -> Self { Self::new_with(ValueData::Symbol(s.into().into_owned())) }
+    pub fn new_symbol(id: u64) -> Self { Self::new_with(ValueData::Symbol(id)) }
     pub fn new_string<'a, T: 'a + Into<Cow<'a, str>>>(x: T) -> Self { Self::new_with(ValueData::String(x.into().into_owned())) }
     pub fn new_pair(a: Value, b: Value) -> Self { Self::new_with(ValueData::Pair(a,b)) }
     pub fn new_condition(x: Value) -> Self { Self::new_with(ValueData::Condition(x)) }
@@ -41,7 +42,7 @@ impl Value {
         let raw: *const () = f as *const ();
         Self::new_with(ValueData::NativeProc(raw))
     }
-    pub fn new_proc(name: Option<Value>, parent_scope: Scope, bindings: Vec<String>, code: Value) -> Self {
+    pub fn new_proc(name: Option<String>, parent_scope: Scope, bindings: Vec<u64>, code: Value) -> Self {
         let procedure = Proc {
             name: name,
             parent_scope: parent_scope,
@@ -69,9 +70,9 @@ impl Value {
         }
     }
 
-    pub fn get_symbol(&self) -> Option<&str> {
+    pub fn get_symbol(&self) -> Option<u64> {
         match self.data() {
-            &ValueData::Symbol(ref s) => Some(&s),
+            &ValueData::Symbol(id) => Some(id),
             _ => None,
         }
     }
@@ -154,20 +155,10 @@ impl Value {
 
     pub fn from_string_to_number(a: &Value) -> Value {
         let s = check_type!(Value::get_string, a, "string");
-        match grammar::parse(s) {
+        match grammar::parse_integer(s) {
             Ok(ref n) if n.get_integer().is_some() => n.clone(),
             _ => return Value::new_condition(Value::new_string(format!("{} is no valid integer", s)))
         }
-    }
-
-    pub fn from_string_to_symbol(a: &Value) -> Value {
-        let s = check_type!(Value::get_string, a, "string");
-        Value::new_symbol(s.clone())
-    }
-
-    pub fn from_symbol_to_string(a: &Value) -> Value {
-        let s = check_type!(Value::get_symbol, a, "symbol");
-        Value::new_string(s.clone())
     }
 
     pub fn new_list(elements: &[Value]) -> Value {
@@ -223,7 +214,7 @@ enum ValueData {
     Bool(bool),
     Char(char),
     Integer(i64),
-    Symbol(String),
+    Symbol(u64),
     String(String),
     Pair(Value, Value),
     EmptyList,
@@ -238,7 +229,7 @@ impl fmt::Display for ValueData {
             &ValueData::Bool(x) => write!(f, "{}", x),
             &ValueData::Char(x) => write!(f, "{}", x),
             &ValueData::Integer(x) => write!(f, "{}", x),
-            &ValueData::Symbol(ref s) => write!(f, "{}", s),
+            &ValueData::Symbol(id) => write!(f, "{}", id), // TODO
             &ValueData::String(ref x) => write!(f, "\"{}\"", x),
             &ValueData::Pair(ref a, ref b) if b.get_pair().is_some() || b.get_empty_list().is_some() => {
                 let iter = ListIter::new(b);
@@ -259,23 +250,23 @@ impl fmt::Display for ValueData {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Proc {
-    name: Option<Value>,
+    name: Option<String>,
     parent_scope: Scope,
-    bindings: Vec<String>,
+    bindings: Vec<u64>,
     code: Value,
 }
 
 impl Proc {
     pub fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
         if self.bindings.len() != args.len() {
-            let name = self.name.clone().unwrap_or(Value::new_symbol(format!("{}", self)));
+            let name = self.name.clone().unwrap_or("lambda".into());
             return Value::new_condition(Value::new_string(
                 format!("arity mismatch for {}: expected: {}, got: {}", name, self.bindings.len(), args.len())));
         }
 
         let mut fn_scope = self.parent_scope.new_child();
-        for (binding, value) in self.bindings.iter().zip(args.iter()) {
-            fn_scope.add_symbol(binding.clone(), value.clone());
+        for (&binding, value) in self.bindings.iter().zip(args.iter()) {
+            fn_scope.add_symbol(binding, value.clone());
         }
 
         let current_scope = interpreter.current_scope.clone(); // this is just one Rc::clone
@@ -289,6 +280,9 @@ impl Proc {
 
 impl fmt::Display for Proc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+
+        write!(f, "[PROC]")
+        /* TODO
         let mut bindings: String = "(".into();
         for b in self.bindings.iter().take(self.bindings.len()-1) {
             bindings.push_str(b);
@@ -299,6 +293,7 @@ impl fmt::Display for Proc {
 
         let name = self.name.as_ref().and_then(Value::get_symbol).unwrap_or("lambda");
         write!(f, "({} {} {})", name, bindings, self.code)
+        */
     }
 }
 

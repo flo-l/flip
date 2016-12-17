@@ -1,9 +1,11 @@
 use std::iter;
+use std::cell::RefCell;
 use ::value::Value;
+use ::string_interner::StringInterner;
 use ::grammar::lexer::unescape_string;
 use super::lexer::{Token, Error};
 
-grammar<'input>(text: &'input str);
+grammar<'input>(text: &'input str, interner: &RefCell<StringInterner>);
 
 extern {
     type Location = usize;
@@ -26,7 +28,7 @@ Char: Value = {
     <c:Chr> => Value::new_char(c),
 };
 
-Integer: Value = {
+pub Integer: Value = {
     <i:Int> => Value::new_integer(i),
 };
 
@@ -35,7 +37,7 @@ Symbol: Value = {
        match s {
            "true" => Value::new_bool(true),
            "false" => Value::new_bool(false),
-           s => Value::new_symbol(s),
+           s => Value::new_symbol(interner.borrow_mut().intern(s)),
        }
    },
 };
@@ -62,7 +64,7 @@ List: Value = {
 };
 
 Item: Value = {
-    Quote <Item> => Value::new_list(&[Value::new_symbol("quote"), <>]),
+    Quote <Item> => Value::new_list(&[Value::new_symbol(interner.borrow_mut().intern("quote")), <>]),
     Char,
     Integer,
     Symbol,
