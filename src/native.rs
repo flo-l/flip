@@ -100,15 +100,30 @@ pub fn if_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 }
 
 pub fn lambda(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    check_arity!("lambda", args.len(), 2);
-    let binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[0]);
+    check_arity!("lambda", args.len(), 2, 3);
+
+    let name;
+    let binding_list;
+    let code;
+    if args.len() == 2 {
+        name = None;
+        binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[0]);
+        code = args[1].clone();
+    } else {
+        // type check name
+        try_unwrap_type!("lambda", "list", Value::get_symbol, &args[0]);
+        name = Some(args[0].clone());
+        binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[1]);
+        code = args[2].clone();
+    }
+
     let mut bindings: Vec<String> = Vec::with_capacity(binding_list.len());
     for v in binding_list.iter() {
         // type check
         bindings.push(try_unwrap_type!("lambda", "symbol", Value::get_symbol, v).into());
     }
 
-    Value::new_proc(interpreter.current_scope.clone(), bindings, args[1].clone())
+    Value::new_proc(name, interpreter.current_scope.clone(), bindings, code)
 }
 
 macro_rules! eval_args {

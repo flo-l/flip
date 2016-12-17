@@ -41,8 +41,9 @@ impl Value {
         let raw: *const () = f as *const ();
         Self::new_with(ValueData::NativeProc(raw))
     }
-    pub fn new_proc(parent_scope: Scope, bindings: Vec<String>, code: Value) -> Self {
+    pub fn new_proc(name: Option<Value>, parent_scope: Scope, bindings: Vec<String>, code: Value) -> Self {
         let procedure = Proc {
+            name: name,
             parent_scope: parent_scope,
             bindings: bindings,
             code: code,
@@ -258,6 +259,7 @@ impl fmt::Display for ValueData {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Proc {
+    name: Option<Value>,
     parent_scope: Scope,
     bindings: Vec<String>,
     code: Value,
@@ -266,8 +268,9 @@ pub struct Proc {
 impl Proc {
     pub fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
         if self.bindings.len() != args.len() {
+            let name = self.name.clone().unwrap_or(Value::new_symbol(format!("{}", self)));
             return Value::new_condition(Value::new_string(
-                format!("arity mismatch for {}: expected: {}, got: {}", self, self.bindings.len(), args.len())));
+                format!("arity mismatch for {}: expected: {}, got: {}", name, self.bindings.len(), args.len())));
         }
 
         let mut fn_scope = self.parent_scope.new_child();
@@ -294,7 +297,8 @@ impl fmt::Display for Proc {
         bindings.push_str(self.bindings.last().unwrap_or(&String::new()));
         bindings.push(')');
 
-        write!(f, "(lambda {} {})", bindings, self.code)
+        let name = self.name.as_ref().and_then(Value::get_symbol).unwrap_or("lambda");
+        write!(f, "({} {} {})", name, bindings, self.code)
     }
 }
 
