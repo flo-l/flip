@@ -49,6 +49,6 @@ Planned:
 - Dynamic scopes (let etc.)
 - Refactor Value so that it doesn't use Rc for everything, just Strings and Pairs maybe
 - Float support
-- Maybe a better tokenizer with non
+- Maybe a better tokenizer with nom
 - Concurrency
 - stdlib
