@@ -20,7 +20,7 @@ impl StringInterner {
         let id = h.finish();
         match self.map.entry(id) {
             Entry::Occupied(o) => debug_assert!(o.get() == &string),
-            Entry::Vacant(mut o) => { o.insert(string.into_owned()); },
+            Entry::Vacant(o) => { o.insert(string.into_owned()); },
         }
         id
     }

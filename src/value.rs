@@ -3,8 +3,6 @@ use std::rc::Rc;
 use std::borrow::Cow;
 use std::mem;
 use std::char;
-use std::hash::{Hash, Hasher};
-use siphasher::sip::SipHasher24 as SipHasher;
 use ::interpreter::Interpreter;
 use ::grammar;
 use ::scope::Scope;
@@ -167,17 +165,9 @@ impl Value {
         let last = iter.next().unwrap(); // safe because list len must be >= 1
         iter.fold(Value::new_pair(last.clone(), Value::empty_list()), |prev_pair, value| Value::new_pair(value.clone(), prev_pair))
     }
-}
 
-pub fn intern_symbol(ident: &str) -> u64 {
-    let mut s = SipHasher::new();
-    ident.hash(&mut s);
-    s.finish()
-}
-
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.val_ptr.fmt(f)
+    pub fn to_string(&self, interner: &StringInterner) -> String {
+        self.data().to_string(interner)
     }
 }
 
@@ -223,27 +213,28 @@ enum ValueData {
     Proc(Proc),
 }
 
-impl fmt::Display for ValueData {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl ValueData {
+    fn to_string(&self, interner: &StringInterner) -> String {
         match self {
-            &ValueData::Bool(x) => write!(f, "{}", x),
-            &ValueData::Char(x) => write!(f, "{}", x),
-            &ValueData::Integer(x) => write!(f, "{}", x),
-            &ValueData::Symbol(id) => write!(f, "{}", id), // TODO
-            &ValueData::String(ref x) => write!(f, "\"{}\"", x),
+            &ValueData::Bool(x) => format!("{}", x),
+            &ValueData::Char(x) => format!("{}", x),
+            &ValueData::Integer(x) => format!("{}", x),
+            &ValueData::Symbol(id) => format!("{}", interner.lookup(id).unwrap_or(&format!("[SYMBOL: {}]", id.to_string()))),
+            &ValueData::String(ref x) => format!("\"{}\"", x),
             &ValueData::Pair(ref a, ref b) if b.get_pair().is_some() || b.get_empty_list().is_some() => {
                 let iter = ListIter::new(b);
-                let mut res = write!(f, "({}", a);
+                let mut res = format!("({}", a.to_string(interner));
                 for x in iter {
-                    res = res.and(write!(f, " {}", x));
+                    res.push_str(&format!(" {}", x.to_string(interner)));
                 }
-                res.and(write!(f, ")"))
+                res.push(')');
+                res
             },
-            &ValueData::Condition(ref x) => write!(f, "[CONDITION: {:?}]", x),
-            &ValueData::Pair(ref a, ref b) => write!(f, "({} . {})", a, b),
-            &ValueData::EmptyList => write!(f, "()"),
-            &ValueData::NativeProc(x) => write!(f, "[NATIVE_PROC: {:?}]", x),
-            &ValueData::Proc(ref p) => write!(f, "[PROC: {}]", p),
+            &ValueData::Condition(ref x) => format!("[CONDITION: {:?}]", x),
+            &ValueData::Pair(ref a, ref b) => format!("({} . {})", a.to_string(interner), b.to_string(interner)),
+            &ValueData::EmptyList => format!("()"),
+            &ValueData::NativeProc(x) => format!("[NATIVE_PROC: {:?}]", x),
+            &ValueData::Proc(ref p) => format!("[PROC: {}]", p),
         }
     }
 }

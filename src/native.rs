@@ -26,11 +26,11 @@ macro_rules! check_arity {
 }
 
 macro_rules! try_unwrap_type {
-    ($fn_name:expr, $type_name:expr, $unwrap_fn:path, $t:expr) => ({
+    ($fn_name:expr, $type_name:expr, $unwrap_fn:path, $t:expr, $interpreter:expr) => ({
         match $unwrap_fn($t) {
             Some(x) => x,
             None => {
-                let s = format!("{} expected {}, got: {}", $fn_name, $type_name, $t);
+                let s = format!("{} expected {}, got: {}", $fn_name, $type_name, $t.to_string($interpreter.get_interner()));
                 return Value::new_condition(Value::new_string(s));
             }
         }
@@ -65,7 +65,7 @@ pub fn quote(_: &mut Interpreter, args: &mut [Value]) -> Value {
 pub fn define(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("define", args.len(), 2);
 
-    let s = try_unwrap_type!("define", "symbol", Value::get_symbol, &args[0]);
+    let s = try_unwrap_type!("define", "symbol", Value::get_symbol, &args[0], interpreter);
     let item = interpreter.evaluate(&args[1]);
     interpreter.current_scope.add_symbol(s, item);
     args[0].clone()
@@ -74,10 +74,10 @@ pub fn define(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 pub fn set(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("set!", args.len(), 2);
 
-    let s = try_unwrap_type!("set!", "symbol", Value::get_symbol, &args[0]);
+    let s = try_unwrap_type!("set!", "symbol", Value::get_symbol, &args[0], interpreter);
     assert_or_condition!(
         interpreter.current_scope.lookup_symbol(s).is_some(),
-        format!("set!: unknown identifier {}", args[0])
+        format!("set!: unknown identifier {}", args[0].to_string(interpreter.get_interner()))
     );
     let item = interpreter.evaluate(&args[1]);
     interpreter.current_scope.add_symbol(s, item);
@@ -95,7 +95,7 @@ pub fn if_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
             interpreter.evaluate(&args[2])
         }
     } else {
-        raise_condition!(format!("if: argument mismatch: expected bool, got: {}", condition));
+        raise_condition!(format!("if: argument mismatch: expected bool, got: {}", condition.to_string(interpreter.get_interner())));
     }
 }
 
@@ -107,20 +107,20 @@ pub fn lambda(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     let code;
     if args.len() == 2 {
         name = None;
-        binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[0]);
+        binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[0], interpreter);
         code = args[1].clone();
     } else {
         // type check name
-        let name_id = try_unwrap_type!("lambda", "list", Value::get_symbol, &args[0]);
+        let name_id = try_unwrap_type!("lambda", "list", Value::get_symbol, &args[0], interpreter);
         name = interpreter.get_interner().lookup(name_id).map(Into::into);
-        binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[1]);
+        binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[1], interpreter);
         code = args[2].clone();
     }
 
     let mut bindings: Vec<u64> = Vec::with_capacity(binding_list.len());
     for v in binding_list.iter() {
         // type check
-        bindings.push(try_unwrap_type!("lambda", "symbol", Value::get_symbol, v));
+        bindings.push(try_unwrap_type!("lambda", "symbol", Value::get_symbol, v, interpreter));
     }
 
     Value::new_proc(name, interpreter.current_scope.clone(), bindings, code)
@@ -136,7 +136,18 @@ macro_rules! eval_args {
             }
             inner(args)
         }
-    )
+    );
+
+    (fn $func:ident($interpreter:ident : &mut Interpreter, $args:ident : $arg_ty:ty) -> $ret_ty:ty $blk:block) =>
+    (
+        pub fn $func(interpreter: &mut Interpreter, args: $arg_ty) -> $ret_ty {
+            fn inner($interpreter: &mut Interpreter, $args: $arg_ty) -> $ret_ty $blk;
+            for x in args.iter_mut() {
+                *x = interpreter.evaluate(x);
+            }
+            inner(interpreter, args)
+        }
+    );
 }
 
 // Polymorphic equality
@@ -180,7 +191,7 @@ type_conversion!(string_number, "string->number", from_string_to_number);
 pub fn symbol_string(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("symbol->string", args.len(), 1);
     let evaled = interpreter.evaluate(&args[0]);
-    let id = try_unwrap_type!("symbol->string", "symbol", Value::get_symbol, &evaled);
+    let id = try_unwrap_type!("symbol->string", "symbol", Value::get_symbol, &evaled, interpreter);
     if let Some(string) = interpreter.get_interner().lookup(id) {
         Value::new_string(string)
     } else {
@@ -191,7 +202,7 @@ pub fn symbol_string(interpreter: &mut Interpreter, args: &mut [Value]) -> Value
 pub fn string_symbol(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("string->symbol", args.len(), 1);
     let evaled = interpreter.evaluate(&args[0]);
-    let string = try_unwrap_type!("string->symbol", "string", Value::get_string, &evaled);
+    let string = try_unwrap_type!("string->symbol", "string", Value::get_string, &evaled, interpreter);
     let id = interpreter.get_interner().intern(string);
     Value::new_symbol(id)
 }
@@ -199,20 +210,20 @@ pub fn string_symbol(interpreter: &mut Interpreter, args: &mut [Value]) -> Value
 // Arithmetic operators
 macro_rules! arithmetic_operator {
     ($func:ident, $operator:path, $default:expr) =>
-    (eval_args!(fn $func(args: &mut [Value]) -> Value {
+    (eval_args!(fn $func(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         let mut res = if args.len() < 2 {
             $default as i64
         } else {
             match args[0].get_integer() {
                 Some(i) => i,
-                None => raise_condition!(format!("expected integer, got: {}", &args[0]))
+                None => raise_condition!(format!("expected integer, got: {}", &args[0].to_string(interpreter.get_interner())))
             }
         };
         for x in args[1..].iter() {
             if let Some(i) = x.get_integer() {
                 res = $operator(res, i);
             } else {
-                raise_condition!(format!("expected integer, got: {}", x))
+                raise_condition!(format!("expected integer, got: {}", x.to_string(interpreter.get_interner())))
             }
         }
         Value::new_integer(res)
@@ -228,19 +239,19 @@ arithmetic_operator!(remainder, Rem::rem, 1);
 // Comparison Operators
 macro_rules! comparison_operator {
     ($func:ident, $lisp_name:expr, $operator:path) =>
-    (eval_args!(fn $func(args: &mut [Value]) -> Value {
+    (eval_args!(fn $func(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         check_arity!($lisp_name, args.len(), 1);
 
         let mut res = true;
         let compared_element = match args[0].get_integer() {
             Some(i) => i,
-            None => raise_condition!(format!("expected integer, got: {}", &args[0]))
+            None => raise_condition!(format!("expected integer, got: {}", &args[0].to_string(interpreter.get_interner())))
         };
 
         for x in &args[1..] {
             let num = match x.get_integer() {
                 Some(i) => i,
-                None => raise_condition!(format!("expected integer, got: {}", x))
+                None => raise_condition!(format!("expected integer, got: {}", x.to_string(interpreter.get_interner())))
             };
             res = res && $operator(&compared_element, &num);
         }
@@ -255,23 +266,23 @@ comparison_operator!(gt, ">", PartialOrd::gt);
 comparison_operator!(ge, ">=", PartialOrd::ge);
 
 // List operations:
-eval_args!(fn car(args: &mut [Value]) -> Value {
+eval_args!(fn car(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("car", args.len(), 1);
 
     if let Some((a, _)) = args[0].get_pair() {
         a.clone()
     } else {
-        raise_condition!(format!("expected pair, got {}", &args[0]));
+        raise_condition!(format!("expected pair, got {}", &args[0].to_string(interpreter.get_interner())));
     }
 });
 
-eval_args!(fn cdr(args: &mut [Value]) -> Value {
+eval_args!(fn cdr(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("cdr", args.len(), 1);
 
     if let Some((_, b)) = args[0].get_pair() {
         b.clone()
     } else {
-        raise_condition!(format!("expected pair, got {}", &args[0]));
+        raise_condition!(format!("expected pair, got {}", &args[0].to_string(interpreter.get_interner())));
     }
 });
 
@@ -297,10 +308,10 @@ pub fn set_car_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
             let quoted = Value::new_list(&[Value::new_symbol(quote_id), new_pair]);
             define(interpreter, &mut [f.clone(), quoted])
         } else {
-            raise_condition!(format!("expected pair, got {}", old_pair));
+            raise_condition!(format!("expected pair, got {}", old_pair.to_string(interpreter.get_interner())));
         }
     } else {
-        raise_condition!(format!("expected symbol, got {}", f));
+        raise_condition!(format!("expected symbol, got {}", f.to_string(interpreter.get_interner())));
     }
 }
 
@@ -317,10 +328,10 @@ pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
             let quoted = Value::new_list(&[Value::new_symbol(quote_id), new_pair]);
             define(interpreter, &mut [f.clone(), quoted])
         } else {
-            raise_condition!(format!("expected pair, got {}", old_pair))
+            raise_condition!(format!("expected pair, got {}", old_pair.to_string(interpreter.get_interner())))
         }
     } else {
-        raise_condition!(format!("expected symbol, got {}", f));
+        raise_condition!(format!("expected symbol, got {}", f.to_string(interpreter.get_interner())));
     }
 }
 

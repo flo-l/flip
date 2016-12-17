@@ -1,9 +1,6 @@
 #![feature(conservative_impl_trait)]
 #[macro_use] extern crate clap;
 
-//TODO remove this (also cargo.toml)
-extern crate regex;
-
 extern crate rustyline;
 extern crate siphasher;
 extern crate lalrpop_util;
@@ -18,7 +15,6 @@ mod native;
 mod string_interner;
 
 use std::io::Read;
-use std::cell::RefCell;
 
 fn main() {
     if let Some(mut file) = cli::get_args() {

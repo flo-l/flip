@@ -76,7 +76,7 @@ impl Interpreter {
                 } else if let Some(p) = func.get_proc() {
                     res = p.evaluate(self, &args);
                 } else {
-                    res = Value::new_condition(Value::new_string(format!("tried to call {}, which is not possible", func)));
+                    res = Value::new_condition(Value::new_string(format!("tried to call {}, which is not possible", func.to_string(self.get_interner()))));
                 }
             } else {
                 res = Value::new_condition(Value::new_string(format!("tried to evaluate ()")));
@@ -84,14 +84,14 @@ impl Interpreter {
         } else if let Some(symbol) = value.get_symbol() {
             res = self.current_scope
             .lookup_symbol(symbol)
-            .unwrap_or(Value::new_condition(Value::new_string(format!("undefined ident: {}", value))));
+            .unwrap_or(Value::new_condition(Value::new_string(format!("undefined ident: {}", value.to_string(self.get_interner())))));
         } else {
             res = value.clone();
         }
 
         // TODO handle condition properly
         match res.get_condition() {
-            Some(x) => panic!("{}", x),
+            Some(x) => panic!("{}", x.to_string(self.get_interner())),
             _ => (),
         };
         res

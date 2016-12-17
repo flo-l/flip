@@ -1,9 +1,8 @@
 mod linked_list;
 
 use std::collections::hash_map::HashMap;
-use std::borrow::Cow;
 use std::cell::RefCell;
-use ::value::{Value, intern_symbol};
+use ::value::Value;
 use self::linked_list::List;
 
 // The list holds ScopeData structs, which store the actual data (say bindings etc. etc.)

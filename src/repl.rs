@@ -1,7 +1,6 @@
 use rustyline;
 use std::iter;
 use std::collections::btree_set::BTreeSet;
-use std::cell::RefCell;
 use ::interpreter;
 use ::grammar::{self, error_printing};
 
@@ -37,7 +36,7 @@ impl Repl {
             // strip \n at the end
             let parsed = grammar::parse(&line, &mut interpreter);
             match parsed {
-                Ok(value) => println!("=> {}", interpreter.evaluate(&value)),
+                Ok(value) => println!("=> {}", interpreter.evaluate(&value).to_string(interpreter.get_interner())),
                 Err(ref err)  => println!("{}", error_printing::create_error_message(&line, err)),
             }
         }
