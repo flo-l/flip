@@ -1,3 +1,4 @@
+#![feature(conservative_impl_trait)]
 #[macro_use] extern crate clap;
 
 //TODO remove this (also cargo.toml)

@@ -1,9 +1,8 @@
 use rustyline;
 use std::iter;
 use std::collections::btree_set::BTreeSet;
-use super::interpreter;
-use super::grammar::{self, error_printing};
-use super::scope::SymbolIterator;
+use ::interpreter;
+use ::grammar::{self, error_printing};
 
 pub struct Repl {}
 
@@ -17,9 +16,7 @@ impl Repl {
         let mut interpreter = interpreter::Interpreter::new();
 
         loop {
-            let idents = SymbolIterator::new(&interpreter.current_scope)
-            .map(|(_, &(ref s, _))| s.clone())
-            .collect();
+            let idents = interpreter.current_scope.symbol_strings();
 
             let completer = IdentCompleter {
                 break_chars: &break_chars,
@@ -54,7 +51,7 @@ impl<'a> rustyline::completion::Completer for IdentCompleter<'a> {
         let matches: Vec<String> = self.ident_list.iter()
         .filter(|&ident| ident.starts_with(word))
         .cloned()
-        //.chain(iter::once(close_params(line)))
+        //.chain(iter::once(close_params(line))) TODO
         .collect();
         Ok((start, matches))
     }

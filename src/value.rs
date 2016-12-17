@@ -7,6 +7,7 @@ use std::hash::{Hash, Hasher};
 use siphasher::sip::SipHasher24 as SipHasher;
 use ::interpreter::Interpreter;
 use ::grammar;
+use ::scope::Scope;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -40,29 +41,31 @@ impl Value {
         let raw: *const () = f as *const ();
         Self::new_with(ValueData::NativeProc(raw))
     }
+    pub fn new_proc(parent_scope: Scope, bindings: Vec<String>, code: Value) -> Self {
+        let procedure = Proc {
+            parent_scope: parent_scope,
+            bindings: bindings,
+            code: code,
+        };
+        Self::new_with(ValueData::Proc(procedure))
+    }
 
     fn data(&self) -> &ValueData {
         &*self.val_ptr
     }
 
-    fn is_pair(&self) -> bool {
-        if let &ValueData::Pair(_, _) = self.data() { true } else { false }
-    }
-
-    pub fn is_list(&self) -> bool {
-        match self.data() {
-            &ValueData::Pair(_, ref b) => b.is_pair() || b.is_empty_list(),
-            &ValueData::EmptyList => true,
-            _ => false
-        }
-    }
-
-    pub fn is_empty_list(&self) -> bool {
-        self.get_empty_list().is_some()
-    }
-
     pub fn get_empty_list(&self) -> Option<()> {
         if let &ValueData::EmptyList = self.data() { Some(()) } else { None }
+    }
+
+    pub fn get_list(&self) -> Option<Vec<Value>> {
+        match self.data() {
+            &ValueData::Pair(_, ref b) if b.get_pair().is_some() || b.get_empty_list().is_some() => {
+                Some(ListIter::new(self).cloned().collect())
+            },
+            &ValueData::EmptyList => Some(vec![]),
+            _ => None
+        }
     }
 
     pub fn get_symbol(&self) -> Option<&str> {
@@ -114,9 +117,16 @@ impl Value {
         }
     }
 
-    pub fn get_fn_ptr(&self) -> Option<fn(&mut Interpreter, &mut [Value]) -> Value> {
+    pub fn get_native_fn_ptr(&self) -> Option<fn(&mut Interpreter, &mut [Value]) -> Value> {
         match self.data() {
             &ValueData::NativeProc(f) => Some(unsafe { mem::transmute(f) }),
+            _ => None,
+        }
+    }
+
+    pub fn get_proc(&self) -> Option<&Proc> {
+        match self.data() {
+            &ValueData::Proc(ref p) => Some(p),
             _ => None,
         }
     }
@@ -193,7 +203,7 @@ impl<'a> Iterator for ListIter<'a> {
     type Item = &'a Value;
     fn next(&mut self) -> Option<Self::Item> {
         match self.current.data() {
-            &ValueData::Pair(ref a, ref b) if b.is_pair() || b.is_empty_list() => {
+            &ValueData::Pair(ref a, ref b) if b.get_pair().is_some() || b.get_empty_list().is_some() => {
                 self.current = b;
                 Some(a)
             },
@@ -218,6 +228,7 @@ enum ValueData {
     EmptyList,
     Condition(Value),
     NativeProc(*const ()),
+    Proc(Proc),
 }
 
 impl fmt::Display for ValueData {
@@ -228,7 +239,7 @@ impl fmt::Display for ValueData {
             &ValueData::Integer(x) => write!(f, "{}", x),
             &ValueData::Symbol(ref s) => write!(f, "{}", s),
             &ValueData::String(ref x) => write!(f, "\"{}\"", x),
-            &ValueData::Pair(ref a, ref b) if b.is_pair() || b.is_empty_list() => {
+            &ValueData::Pair(ref a, ref b) if b.get_pair().is_some() || b.get_empty_list().is_some() => {
                 let iter = ListIter::new(b);
                 let mut res = write!(f, "({}", a);
                 for x in iter {
@@ -240,7 +251,50 @@ impl fmt::Display for ValueData {
             &ValueData::Pair(ref a, ref b) => write!(f, "({} . {})", a, b),
             &ValueData::EmptyList => write!(f, "()"),
             &ValueData::NativeProc(x) => write!(f, "[NATIVE_PROC: {:?}]", x),
+            &ValueData::Proc(ref p) => write!(f, "[PROC: {}]", p),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Proc {
+    parent_scope: Scope,
+    bindings: Vec<String>,
+    code: Value,
+}
+
+impl Proc {
+    pub fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
+        if self.bindings.len() != args.len() {
+            return Value::new_condition(Value::new_string(
+                format!("arity mismatch for {}: expected: {}, got: {}", self, self.bindings.len(), args.len())));
+        }
+
+        let mut fn_scope = self.parent_scope.new_child();
+        for (binding, value) in self.bindings.iter().zip(args.iter()) {
+            fn_scope.add_symbol(binding.clone(), value.clone());
+        }
+
+        let current_scope = interpreter.current_scope.clone(); // this is just one Rc::clone
+        interpreter.current_scope = fn_scope;
+
+        let res = interpreter.evaluate(&self.code);
+        interpreter.current_scope = current_scope;
+        res
+    }
+}
+
+impl fmt::Display for Proc {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut bindings: String = "(".into();
+        for b in self.bindings.iter().take(self.bindings.len()-1) {
+            bindings.push_str(b);
+            bindings.push(' ');
+        }
+        bindings.push_str(self.bindings.last().unwrap_or(&String::new()));
+        bindings.push(')');
+
+        write!(f, "(lambda {} {})", bindings, self.code)
     }
 }
 

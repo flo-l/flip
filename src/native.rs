@@ -1,11 +1,14 @@
 use std::ops::{Add, Sub, Mul, Div, Rem};
 use ::value::Value;
 use ::interpreter::Interpreter;
-use ::scope::SymbolIterator;
 
 macro_rules! check_arity {
-    ($name:expr, $len:expr, $exact:expr)
-    => (check_arity!($name, $len, $exact, $exact));
+    ($name:expr, $len:expr, $exact:expr) => ({
+        let len = $len as u32;
+        if len != $exact {
+            raise_condition!(format!("arity mismatch for {}: expected: {}, got: {}", $name, $exact, len));
+        }
+    });
 
     ($name:expr, $len:expr, $lo:expr, $hi:expr) => ({
         let len = $len as u32;
@@ -73,7 +76,7 @@ pub fn set(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 
     let s = try_unwrap_type!("set!", "symbol", Value::get_symbol, &args[0]);
     assert_or_condition!(
-        interpreter.current_scope.lookup_symbol_string(s).is_some(),
+        interpreter.current_scope.lookup_symbol_with_string(s).is_some(),
         format!("set!: unknown identifier {}", args[0])
     );
     let item = interpreter.evaluate(&args[1]);
@@ -94,6 +97,18 @@ pub fn if_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     } else {
         raise_condition!(format!("if: argument mismatch: expected bool, got: {}", condition));
     }
+}
+
+pub fn lambda(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    check_arity!("lambda", args.len(), 2);
+    let binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[0]);
+    let mut bindings: Vec<String> = Vec::with_capacity(binding_list.len());
+    for v in binding_list.iter() {
+        // type check
+        bindings.push(try_unwrap_type!("lambda", "symbol", Value::get_symbol, v).into());
+    }
+
+    Value::new_proc(interpreter.current_scope.clone(), bindings, args[1].clone())
 }
 
 macro_rules! eval_args {
@@ -131,7 +146,7 @@ type_checker!(integer_, "integer?", get_integer);
 type_checker!(char_, "char?", get_char);
 type_checker!(string_, "string?", get_string);
 type_checker!(pair_, "pair?", get_pair);
-type_checker!(procedure_, "procedure?", get_fn_ptr);
+type_checker!(procedure_, "procedure?", get_native_fn_ptr);
 
 // Type conversions
 macro_rules! type_conversion {
@@ -279,8 +294,9 @@ pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 pub fn symbol_space(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("symbol-space", args.len(), 0);
 
-    let symbols: Vec<Value> = SymbolIterator::new(&interpreter.current_scope)
-    .map(|(_, &(ref s, _))| Value::new_symbol(s.clone()))
+    let symbols: Vec<Value> = interpreter.current_scope.symbol_strings()
+    .into_iter()
+    .map(|s| Value::new_symbol(s))
     .collect();
 
     Value::new_list(&symbols)

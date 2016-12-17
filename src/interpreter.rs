@@ -1,6 +1,6 @@
-use super::value::{Value, ListIter};
-use super::scope::Scope;
-use super::native;
+use ::value::Value;
+use ::scope::Scope;
+use ::native;
 
 pub struct Interpreter {
     pub current_scope: Scope,
@@ -9,7 +9,7 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         let mut interpreter = Interpreter {
-            current_scope: Scope::new()
+            current_scope: Scope::new(),
         };
         interpreter.init();
         interpreter
@@ -21,6 +21,7 @@ impl Interpreter {
         self.current_scope.add_symbol("set!", Value::new_native_proc(native::set));
         self.current_scope.add_symbol("if", Value::new_native_proc(native::if_));
         self.current_scope.add_symbol("eq?", Value::new_native_proc(native::eq_));
+        self.current_scope.add_symbol("lambda", Value::new_native_proc(native::lambda));
 
         self.current_scope.add_symbol("null?", Value::new_native_proc(native::null_));
         self.current_scope.add_symbol("boolean?", Value::new_native_proc(native::boolean_));
@@ -62,14 +63,15 @@ impl Interpreter {
 
     pub fn evaluate(&mut self, value: &Value) -> Value {
         let res: Value;
-        if value.is_list() {
-            let mut list: Vec<Value> = ListIter::new(value).cloned().collect();
+        if let Some(mut list) = value.get_list() {
             if list.len() > 0 {
                 let (func, mut args) = list.split_at_mut(1);
                 let func = self.evaluate(&func[0]);
 
-                if let Some(f) = func.get_fn_ptr() {
+                if let Some(f) = func.get_native_fn_ptr() {
                     res = f(self, &mut args)
+                } else if let Some(p) = func.get_proc() {
+                    res = p.evaluate(self, &args);
                 } else {
                     res = Value::new_condition(Value::new_string(format!("tried to call {}, which is not possible", func)));
                 }
@@ -78,8 +80,7 @@ impl Interpreter {
             };
         } else if let Some(symbol) = value.get_symbol() {
             res = self.current_scope
-            .lookup_symbol_string(symbol)
-            .map(|&(_, ref value)| value.clone())
+            .lookup_symbol_with_string(symbol)
             .unwrap_or(Value::new_condition(Value::new_string(format!("undefined ident: {}", value))));
         } else {
             res = value.clone();
