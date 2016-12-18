@@ -255,16 +255,24 @@ impl Proc {
                 format!("arity mismatch for {}: expected: {}, got: {}", name, self.bindings.len(), args.len())));
         }
 
+        // evaluate args in current scope
+        let evaluated_args: Vec<Value> = args.iter().map(|x| interpreter.evaluate(x)).collect();
+
+        // create new scope for fn from fns parent scope
         let mut fn_scope = self.parent_scope.new_child();
-        for (&binding, value) in self.bindings.iter().zip(args.iter()) {
-            fn_scope.add_symbol(binding, value.clone());
+
+        // add args to fn scope
+        for (&binding, value) in self.bindings.iter().zip(evaluated_args.into_iter()) {
+            fn_scope.add_symbol(binding, value);
         }
 
-        let current_scope = interpreter.current_scope.clone(); // this is just one Rc::clone
-        interpreter.current_scope = fn_scope;
+        // backup current scope
+        let old_scope = interpreter.current_scope.clone(); // this is just one Rc::clone
 
+        // evaluate code in fn scope
+        interpreter.current_scope = fn_scope;
         let res = interpreter.evaluate(&self.code);
-        interpreter.current_scope = current_scope;
+        interpreter.current_scope = old_scope;
         res
     }
 }
