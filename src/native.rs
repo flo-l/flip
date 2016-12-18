@@ -181,17 +181,52 @@ eval_args!(fn procedure_(args: &mut [Value]) -> Value {
 
 // Type conversions
 macro_rules! type_conversion {
-    ($func:ident, $lisp_name:expr, $conversion_fn:ident) =>
-    (eval_args!(fn $func(args: &mut [Value]) -> Value {
+    ($func:ident, $lisp_name:expr, $type_name:expr, $get_fn:path, $conversion_fn:expr, $new_fn:path) =>
+    (eval_args!(fn $func(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         check_arity!($lisp_name, args.len(), 1);
-        Value::$conversion_fn(&args[0])
+        let conversion_fn = $conversion_fn;
+        let rust_value = try_unwrap_type!($lisp_name, $type_name, $get_fn, &args[0], interpreter);
+        let converted = conversion_fn(rust_value);
+        $new_fn(converted)
     }););
 }
 
-type_conversion!(char_integer, "char->integer", from_char_to_integer);
-type_conversion!(integer_char, "integer->char", from_integer_to_char);
-type_conversion!(number_string, "number->string", from_number_to_string);
-type_conversion!(string_number, "string->number", from_string_to_number);
+
+
+eval_args!(fn char_integer(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    check_arity!("char->integer", args.len(), 1);
+    let c = try_unwrap_type!("char->integer", "char", Value::get_char, &args[0], interpreter);
+    Value::new_integer(c as i64)
+});
+
+eval_args!(fn integer_char(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    use std::u32;
+    use std::char;
+    check_arity!("integer->char", args.len(), 1);
+    let i = try_unwrap_type!("integer->char", "integer", Value::get_integer, &args[0], interpreter);
+    if i > 0 && i < u32::MAX as i64 {
+        let u = i as u32;
+        if let Some(c) = char::from_u32(u) {
+            return Value::new_char(c)
+        }
+    }
+    raise_condition!("integer is not a valid char");
+});
+
+eval_args!(fn number_string(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    check_arity!("number->string", args.len(), 1);
+    let i = try_unwrap_type!("number->string", "integer", Value::get_integer, &args[0], interpreter);
+    Value::new_string(format!("{}", i))
+});
+
+eval_args!(fn string_number(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    check_arity!("string->number", args.len(), 1);
+    let s = try_unwrap_type!("string->number", "string", Value::get_string, &args[0], interpreter);
+    if let Ok(i) = s.parse::<i64>() {
+        return Value::new_integer(i);
+    }
+    raise_condition!(format!("string is not a valid integer: {:?}", s));
+});
 
 pub fn symbol_string(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("symbol->string", args.len(), 1);

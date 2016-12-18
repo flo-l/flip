@@ -131,34 +131,6 @@ impl Value {
         }
     }
 
-    pub fn from_char_to_integer(a: &Value) -> Value {
-        let c = check_type!(Value::get_char, a, "char");
-        Value::new_integer(c as i64)
-    }
-
-    pub fn from_integer_to_char(a: &Value) -> Value {
-        let i = check_type!(Value::get_integer, a, "integer");
-        let c = char::from_u32(i as u32);
-        if i > char::MAX as i64 || c.is_none() {
-            return Value::new_condition(Value::new_string(format!("{} is no valid char", i)))
-        } else {
-            Value::new_char(c.unwrap())
-        }
-    }
-
-    pub fn from_number_to_string(a: &Value) -> Value {
-        let i = check_type!(Value::get_integer, a, "integer");
-        Value::new_string(format!("{}", i))
-    }
-
-    pub fn from_string_to_number(a: &Value) -> Value {
-        let s = check_type!(Value::get_string, a, "string");
-        match grammar::parse_integer(s) {
-            Ok(ref n) if n.get_integer().is_some() => n.clone(),
-            _ => return Value::new_condition(Value::new_string(format!("{} is no valid integer", s)))
-        }
-    }
-
     pub fn new_list(elements: &[Value]) -> Value {
         if elements.len() == 0 { return Value::empty_list(); }
         let mut iter = elements.into_iter().rev();
