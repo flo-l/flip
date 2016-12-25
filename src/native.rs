@@ -152,7 +152,7 @@ macro_rules! eval_args {
 }
 
 // Polymorphic equality
-eval_args!(fn eq_(args: &mut [Value]) -> Value {
+eval_args!(fn poly_eq(args: &mut [Value]) -> Value {
     check_arity!("eq?", args.len(), min => 2);
     Value::new_bool(args.windows(2).all(|window| window[0] == window[1]))
 });
@@ -281,7 +281,7 @@ arithmetic_operator!(remainder, Rem::rem, 1);
 macro_rules! comparison_operator {
     ($func:ident, $lisp_name:expr, $operator:path) =>
     (eval_args!(fn $func(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-        check_arity!($lisp_name, args.len(), 1);
+        check_arity!($lisp_name, args.len(), min => 2);
 
         let mut res = true;
         let compared_element = match args[0].get_integer() {
