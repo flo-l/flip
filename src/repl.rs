@@ -9,7 +9,7 @@ pub struct Repl {}
 impl Repl {
     pub fn start() {
         let quit = "(quit)";
-        let break_chars: BTreeSet<char> = vec![' ', '('].into_iter().collect();
+        let break_chars: BTreeSet<char> = vec![' ', '(', '\''].into_iter().collect();
         let mut rl = rustyline::Editor::<IdentCompleter>::new();
         rl.add_history_entry(quit);
 
@@ -51,11 +51,24 @@ struct IdentCompleter<'a> {
 impl<'a> rustyline::completion::Completer for IdentCompleter<'a> {
     fn complete(&self, line: &str, pos: usize) -> rustyline::Result<(usize, Vec<String>)> {
         let (start, word) = rustyline::completion::extract_word(line, pos, &self.break_chars);
-        let matches: Vec<String> = self.ident_list.iter()
+
+        let symbol_matches =
+        self.ident_list.iter()
         .filter(|&ident| ident.starts_with(word))
-        .cloned()
-        //.chain(iter::once(close_params(line))) TODO
-        .collect();
+        .cloned();
+
+        // if word is just whitespaces return closing parens as first result
+        let matches: Vec<String> = if word.chars().all(|c| c == ' ') {
+            iter::once(close_params(line))
+            .chain(symbol_matches)
+            .collect()
+        // else return closing parens as last result
+        } else {
+            symbol_matches
+            .chain(iter::once(close_params(line)))
+            .collect()
+        };
+
         Ok((start, matches))
     }
 }
