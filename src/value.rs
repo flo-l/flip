@@ -11,16 +11,6 @@ pub struct Value {
     val_ptr: Rc<ValueData>
 }
 
-macro_rules! check_type {
-    ($unwrap_fn:path, $e:expr, $type_name:expr) =>
-    ({
-        match $unwrap_fn($e) {
-            Some(x) => x,
-            None => return Value::new_condition(Value::new_string(format!("expected {}, got {:?}", $type_name, $e))),
-        }
-    });
-}
-
 impl Value {
     fn new_with(data: ValueData) -> Self {
         Value { val_ptr: Rc::new(data) }
