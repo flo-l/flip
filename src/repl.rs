@@ -18,7 +18,7 @@ impl Repl {
         loop {
             let idents: Vec<String> = interpreter.current_scope.symbol_ids()
             .into_iter()
-            .filter_map(|id| interpreter.get_interner().lookup(id).map(Into::into))
+            .filter_map(|id| interpreter.interner.lookup(id).map(Into::into))
             .collect();
 
             let completer = IdentCompleter {
@@ -36,7 +36,7 @@ impl Repl {
             // strip \n at the end
             let parsed = grammar::parse(&line, &mut interpreter);
             match parsed {
-                Ok(value) => println!("=> {}", interpreter.evaluate(&value).to_string(interpreter.get_interner())),
+                Ok(value) => println!("=> {}", interpreter.evaluate(&value).to_string(&interpreter.interner)),
                 Err(ref err)  => println!("{}", error_printing::create_error_message(&line, err)),
             }
         }

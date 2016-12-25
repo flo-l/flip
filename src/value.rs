@@ -4,7 +4,6 @@ use std::borrow::Cow;
 use std::mem;
 use std::char;
 use ::interpreter::Interpreter;
-use ::grammar;
 use ::scope::Scope;
 use ::string_interner::StringInterner;
 

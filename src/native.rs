@@ -1,6 +1,7 @@
 use std::ops::{Add, Sub, Mul, Div, Rem};
 use ::value::Value;
 use ::interpreter::Interpreter;
+use ::grammar;
 
 macro_rules! check_arity {
     ($name:expr, $len:expr, $exact:expr) => ({
@@ -30,7 +31,7 @@ macro_rules! try_unwrap_type {
         match $unwrap_fn($t) {
             Some(x) => x,
             None => {
-                let s = format!("{} expected {}, got: {}", $fn_name, $type_name, $t.to_string($interpreter.get_interner()));
+                let s = format!("{} expected {}, got: {}", $fn_name, $type_name, $t.to_string(&$interpreter.interner));
                 return Value::new_condition(Value::new_string(s));
             }
         }
@@ -77,7 +78,7 @@ pub fn set(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     let s = try_unwrap_type!("set!", "symbol", Value::get_symbol, &args[0], interpreter);
     assert_or_condition!(
         interpreter.current_scope.lookup_symbol(s).is_some(),
-        format!("set!: unknown identifier {}", args[0].to_string(interpreter.get_interner()))
+        format!("set!: unknown identifier {}", args[0].to_string(&interpreter.interner))
     );
     let item = interpreter.evaluate(&args[1]);
     interpreter.current_scope.add_symbol(s, item);
@@ -95,7 +96,7 @@ pub fn if_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
             interpreter.evaluate(&args[2])
         }
     } else {
-        raise_condition!(format!("if: argument mismatch: expected bool, got: {}", condition.to_string(interpreter.get_interner())));
+        raise_condition!(format!("if: argument mismatch: expected bool, got: {}", condition.to_string(&interpreter.interner)));
     }
 }
 
@@ -112,7 +113,7 @@ pub fn lambda(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     } else {
         // type check name
         let name_id = try_unwrap_type!("lambda", "list", Value::get_symbol, &args[0], interpreter);
-        name = interpreter.get_interner().lookup(name_id).map(Into::into);
+        name = interpreter.interner.lookup(name_id).map(Into::into);
         binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[1], interpreter);
         code = args[2].clone();
     }
@@ -222,8 +223,8 @@ eval_args!(fn number_string(interpreter: &mut Interpreter, args: &mut [Value]) -
 eval_args!(fn string_number(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("string->number", args.len(), 1);
     let s = try_unwrap_type!("string->number", "string", Value::get_string, &args[0], interpreter);
-    if let Ok(i) = s.parse::<i64>() {
-        return Value::new_integer(i);
+    if let Ok(v) = grammar::parse_integer(s) {
+        return v;
     }
     raise_condition!(format!("string is not a valid integer: {:?}", s));
 });
@@ -232,7 +233,7 @@ pub fn symbol_string(interpreter: &mut Interpreter, args: &mut [Value]) -> Value
     check_arity!("symbol->string", args.len(), 1);
     let evaled = interpreter.evaluate(&args[0]);
     let id = try_unwrap_type!("symbol->string", "symbol", Value::get_symbol, &evaled, interpreter);
-    if let Some(string) = interpreter.get_interner().lookup(id) {
+    if let Some(string) = interpreter.interner.lookup(id) {
         Value::new_string(string)
     } else {
         raise_condition!("internal error: invalid symbol")
@@ -243,7 +244,7 @@ pub fn string_symbol(interpreter: &mut Interpreter, args: &mut [Value]) -> Value
     check_arity!("string->symbol", args.len(), 1);
     let evaled = interpreter.evaluate(&args[0]);
     let string = try_unwrap_type!("string->symbol", "string", Value::get_string, &evaled, interpreter);
-    let id = interpreter.get_interner().intern(string);
+    let id = interpreter.interner.intern(string);
     Value::new_symbol(id)
 }
 
@@ -256,14 +257,14 @@ macro_rules! arithmetic_operator {
         } else {
             match args[0].get_integer() {
                 Some(i) => i,
-                None => raise_condition!(format!("expected integer, got: {}", &args[0].to_string(interpreter.get_interner())))
+                None => raise_condition!(format!("expected integer, got: {}", &args[0].to_string(&interpreter.interner)))
             }
         };
         for x in args[1..].iter() {
             if let Some(i) = x.get_integer() {
                 res = $operator(res, i);
             } else {
-                raise_condition!(format!("expected integer, got: {}", x.to_string(interpreter.get_interner())))
+                raise_condition!(format!("expected integer, got: {}", x.to_string(&interpreter.interner)))
             }
         }
         Value::new_integer(res)
@@ -285,13 +286,13 @@ macro_rules! comparison_operator {
         let mut res = true;
         let compared_element = match args[0].get_integer() {
             Some(i) => i,
-            None => raise_condition!(format!("expected integer, got: {}", &args[0].to_string(interpreter.get_interner())))
+            None => raise_condition!(format!("expected integer, got: {}", &args[0].to_string(&interpreter.interner)))
         };
 
         for x in &args[1..] {
             let num = match x.get_integer() {
                 Some(i) => i,
-                None => raise_condition!(format!("expected integer, got: {}", x.to_string(interpreter.get_interner())))
+                None => raise_condition!(format!("expected integer, got: {}", x.to_string(&interpreter.interner)))
             };
             res = res && $operator(&compared_element, &num);
         }
@@ -312,7 +313,7 @@ eval_args!(fn car(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     if let Some((a, _)) = args[0].get_pair() {
         a.clone()
     } else {
-        raise_condition!(format!("expected pair, got {}", &args[0].to_string(interpreter.get_interner())));
+        raise_condition!(format!("expected pair, got {}", &args[0].to_string(&interpreter.interner)));
     }
 });
 
@@ -322,7 +323,7 @@ eval_args!(fn cdr(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     if let Some((_, b)) = args[0].get_pair() {
         b.clone()
     } else {
-        raise_condition!(format!("expected pair, got {}", &args[0].to_string(interpreter.get_interner())));
+        raise_condition!(format!("expected pair, got {}", &args[0].to_string(&interpreter.interner)));
     }
 });
 
@@ -344,14 +345,14 @@ pub fn set_car_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         let old_pair = interpreter.evaluate(f);
         if let Some((_, b)) = old_pair.get_pair() {
             let new_pair = Value::new_pair(elem.clone(), b.clone());
-            let quote_id = interpreter.get_interner().intern("quote");
+            let quote_id = interpreter.interner.intern("quote");
             let quoted = Value::new_list(&[Value::new_symbol(quote_id), new_pair]);
             define(interpreter, &mut [f.clone(), quoted])
         } else {
-            raise_condition!(format!("expected pair, got {}", old_pair.to_string(interpreter.get_interner())));
+            raise_condition!(format!("expected pair, got {}", old_pair.to_string(&interpreter.interner)));
         }
     } else {
-        raise_condition!(format!("expected symbol, got {}", f.to_string(interpreter.get_interner())));
+        raise_condition!(format!("expected symbol, got {}", f.to_string(&interpreter.interner)));
     }
 }
 
@@ -364,14 +365,14 @@ pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         let old_pair = interpreter.evaluate(f);
         if let Some((a, _)) = old_pair.get_pair() {
             let new_pair = Value::new_pair(a.clone(), elem.clone());
-            let quote_id = interpreter.get_interner().intern("quote");
+            let quote_id = interpreter.interner.intern("quote");
             let quoted = Value::new_list(&[Value::new_symbol(quote_id), new_pair]);
             define(interpreter, &mut [f.clone(), quoted])
         } else {
-            raise_condition!(format!("expected pair, got {}", old_pair.to_string(interpreter.get_interner())))
+            raise_condition!(format!("expected pair, got {}", old_pair.to_string(&interpreter.interner)))
         }
     } else {
-        raise_condition!(format!("expected symbol, got {}", f.to_string(interpreter.get_interner())));
+        raise_condition!(format!("expected symbol, got {}", f.to_string(&interpreter.interner)));
     }
 }
 

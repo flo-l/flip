@@ -4,14 +4,14 @@ use ::native;
 use ::string_interner::StringInterner;
 
 pub struct Interpreter {
-    string_interner: Option<StringInterner>,
+    pub interner: StringInterner,
     pub current_scope: Scope,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         let mut interpreter = Interpreter {
-            string_interner: Some(StringInterner::new()),
+            interner: StringInterner::new(),
             current_scope: Scope::new(),
         };
         interpreter.init();
@@ -76,7 +76,7 @@ impl Interpreter {
                 } else if let Some(p) = func.get_proc() {
                     res = p.evaluate(self, &args);
                 } else {
-                    res = Value::new_condition(Value::new_string(format!("tried to call {}, which is not possible", func.to_string(self.get_interner()))));
+                    res = Value::new_condition(Value::new_string(format!("tried to call {}, which is not possible", func.to_string(&self.interner))));
                 }
             } else {
                 res = Value::new_condition(Value::new_string(format!("tried to evaluate ()")));
@@ -84,33 +84,21 @@ impl Interpreter {
         } else if let Some(symbol) = value.get_symbol() {
             res = self.current_scope
             .lookup_symbol(symbol)
-            .unwrap_or(Value::new_condition(Value::new_string(format!("undefined ident: {}", value.to_string(self.get_interner())))));
+            .unwrap_or(Value::new_condition(Value::new_string(format!("undefined ident: {}", value.to_string(&self.interner)))));
         } else {
             res = value.clone();
         }
 
         // TODO handle condition properly
         match res.get_condition() {
-            Some(x) => panic!("{}", x.to_string(self.get_interner())),
+            Some(x) => panic!("{}", x.to_string(&self.interner)),
             _ => (),
         };
         res
     }
 
     fn add_str_to_current_scope(&mut self, s: &str, value: Value) {
-        let id = self.get_interner().intern(s);
+        let id = self.interner.intern(s);
         self.current_scope.add_symbol(id, value);
-    }
-
-    pub fn get_interner(&mut self) -> &mut StringInterner {
-        self.string_interner.as_mut().expect("internal error: string interner uninitialized")
-    }
-
-    pub fn move_interner(&mut self) -> StringInterner {
-        self.string_interner.take().expect("internal error: string interner uninitialized")
-    }
-
-    pub fn set_interner(&mut self, interner: StringInterner) {
-        self.string_interner = Some(interner);
     }
 }

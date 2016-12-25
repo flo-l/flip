@@ -1,11 +1,10 @@
 use std::iter;
-use std::cell::RefCell;
 use ::value::Value;
 use ::string_interner::StringInterner;
 use ::grammar::lexer::unescape_string;
 use super::lexer::{Token, Error};
 
-grammar<'input>(text: &'input str, interner: &RefCell<StringInterner>);
+grammar<'input>(text: &'input str, interner_valid: bool, interner: &mut StringInterner);
 
 extern {
     type Location = usize;
@@ -37,7 +36,10 @@ Symbol: Value = {
        match s {
            "true" => Value::new_bool(true),
            "false" => Value::new_bool(false),
-           s => Value::new_symbol(interner.borrow_mut().intern(s)),
+           s => {
+               assert!(interner_valid, "internal error: interner not set");
+               Value::new_symbol(interner.intern(s))
+           },
        }
    },
 };
@@ -64,7 +66,10 @@ List: Value = {
 };
 
 Item: Value = {
-    Quote <Item> => Value::new_list(&[Value::new_symbol(interner.borrow_mut().intern("quote")), <>]),
+    Quote <Item> => {
+        assert!(interner_valid, "internal error: interner not set");
+        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
+    },
     Char,
     Integer,
     Symbol,
