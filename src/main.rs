@@ -21,7 +21,7 @@ fn main() {
         let mut input = String::new();
         file.read_to_string(&mut input).expect("Couldn't read file");
         let mut interpreter = interpreter::Interpreter::new();
-        let parsed = grammar::parse(&input, &mut interpreter).unwrap();
+        let parsed = grammar::parse(&input, &mut interpreter.interner).unwrap();
         println!("{:?}", interpreter.evaluate(&parsed));
     } else {
         repl::Repl::start();

@@ -34,7 +34,7 @@ impl Repl {
             rl.add_history_entry(&line);
 
             // strip \n at the end
-            let parsed = grammar::parse(&line, &mut interpreter);
+            let parsed = grammar::parse(&line, &mut interpreter.interner);
             match parsed {
                 Ok(value) => println!("=> {}", interpreter.evaluate(&value).to_string(&interpreter.interner)),
                 Err(ref err)  => println!("{}", error_printing::create_error_message(&line, err)),

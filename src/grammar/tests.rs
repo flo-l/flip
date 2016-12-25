@@ -3,24 +3,9 @@ use lalrpop_util::ParseError;
 use ::value::Value;
 use super::parse;
 use super::lexer::{Token, Error};
+use ::string_interner::StringInterner;
 
 const EOF: usize = usize::MAX;
-
-fn unrecognized(x: &ParseError<usize, Token, Error>) -> usize {
-    if let &ParseError::UnrecognizedToken{expected: _, token: Some((pos, _, _))} = x {
-        pos
-    } else {
-        panic!("expected: unrecognized, got: {:?}", x)
-    }
-}
-
-fn invalid(x: &ParseError<usize, Token, Error>) -> usize {
-    if let &ParseError::InvalidToken{location: pos} = x {
-        pos
-    } else {
-        panic!("expected: invalid, got: {:?}", x)
-    }
-}
 
 fn whatever(x: &ParseError<usize, Token, Error>) -> usize {
     match x {
@@ -34,16 +19,6 @@ fn whatever(x: &ParseError<usize, Token, Error>) -> usize {
 }
 
 macro_rules! expect_error {
-    // unrecognized token
-    ($parser:ident, $input:expr, unrecognized: $position:expr) => (
-        expect_error!($parser, $input, unrecognized, true, $position);
-    );
-
-    // invalid token
-    ($parser:ident, $input:expr, invalid: $position:expr) => (
-        expect_error!($parser, $input, invalid, true, $position);
-    );
-
     // whatever
     ($parser:ident, $input:expr, $position:expr) => (
         expect_error!($parser, $input, whatever, true, $position);
@@ -57,44 +32,52 @@ macro_rules! expect_error {
     //internal
     ($parser:ident, $input:expr, $token_fn:ident, $use_pos:expr, $position:expr) => (
         let input = &*$input;
-        let result = $parser(input);
+        let interner = &mut StringInterner::new();
+        let result = $parser(input, interner);
 
-        if let Err(ref err) = result {
-            if $use_pos && $token_fn(err) != $position {
-                panic!("for input: {:?}, got error {:?} at pos {}, expected pos: {}", input, result, $token_fn(err), $position)
-            }
-        } else {
-            panic!("expected error for string: '{}', got: {:?}", input, result);
+        match result {
+            Err(ref err) => {
+                if $use_pos && $token_fn(err) != $position {
+                    panic!("for input: {:?}, got Err({:?}) at pos {}, expected pos: {}", input, err, $token_fn(err), $position);
+                }
+            },
+            Ok(v) => panic!("expected error for string: '{}', got: {}", input, v.to_string(interner)),
         }
     );
 }
 
 macro_rules! expect_ok {
     // with rest
-    ($parser:ident, $input:expr, $expected:expr) => (
+    ($parser:ident, $interner:expr, $input:expr, $expected:expr) => (
         let input = &*$input;
-        let expected = $expected;
-        let result = $parser(input);
-        if let Ok(v) = result {
-            if v != expected {
-                panic!("parser ok, but input: {:?} got: Ok({:?}), expected: {:?}", input, v, &expected);
+        let expected = $expected.to_string($interner);
+        let result = $parser(input, $interner);
+        match result {
+            Ok(v) => {
+                let res = v.to_string($interner);
+                if res != expected {
+                    panic!("parser ok, but input: {:?} got: Ok({:?}), expected: {}", input, res, expected);
+                }
+            },
+            Err(e) => {
+                panic!("input: {:?} got: Err({:?}), expected: {}", input, e, &expected);
             }
-        } else {
-            panic!("input: {:?} got: {:?}, expected: {:?}", input, result, &expected);
         }
     );
 }
 
 #[test]
 fn bool() {
-    expect_ok!(parse, "true", Value::new_bool(true));
-    expect_ok!(parse, "false", Value::new_bool(false));
-    expect_ok!(parse, "trude", Value::new_symbol("trude"));
-    expect_ok!(parse, "fale", Value::new_symbol("fale"));
+    let interner = &mut StringInterner::new();
+    expect_ok!(parse, interner, "true", Value::new_bool(true));
+    expect_ok!(parse, interner, "false", Value::new_bool(false));
+    expect_ok!(parse, interner, "trude", Value::new_symbol(interner.intern("trude")));
+    expect_ok!(parse, interner, "fale", Value::new_symbol(interner.intern("fale")));
 }
 
 #[test]
 fn char() {
+    let interner = &mut StringInterner::new();
     use std::char;
     use std::iter;
     let mut input: String = "#\\".into();
@@ -102,7 +85,7 @@ fn char() {
     for x in printlable_asci {
         let c = char::from_u32(x).expect(&format!("tried to create invalid char with: 0x{:X}", x));
         input.push(c);
-        { expect_ok!(parse, input, Value::new_char(c)); }
+        { expect_ok!(parse, interner, input, Value::new_char(c)); }
         input.pop();
     }
 
@@ -115,37 +98,39 @@ fn char() {
     }
 
     // special forms
-    expect_ok!(parse, r"#\\s", Value::new_char(' '));
-    expect_ok!(parse, r"#\\t", Value::new_char('\t'));
-    expect_ok!(parse, r"#\\n", Value::new_char('\n'));
-    expect_ok!(parse, r"#\\", Value::new_char('\\'));
-    expect_ok!(parse, r"#\", Value::new_symbol(r"#\"));
+    expect_ok!(parse, interner, r"#\\s", Value::new_char(' '));
+    expect_ok!(parse, interner, r"#\\t", Value::new_char('\t'));
+    expect_ok!(parse, interner, r"#\\n", Value::new_char('\n'));
+    expect_ok!(parse, interner, r"#\\", Value::new_char('\\'));
+    expect_ok!(parse, interner, r"#\", Value::new_symbol(interner.intern(r"#\")));
 
     expect_error!(parse, "#\\\0", 2);
 }
 
 #[test]
 fn integer() {
-    expect_ok!(parse, "007", Value::new_integer(7));
-    expect_ok!(parse, "-007", Value::new_integer(-7));
-    expect_ok!(parse, "123456789", Value::new_integer(123456789));
-    expect_ok!(parse, "-123456789", Value::new_integer(-123456789));
+    let interner = &mut StringInterner::new();
+    expect_ok!(parse, interner, "007", Value::new_integer(7));
+    expect_ok!(parse, interner, "-007", Value::new_integer(-7));
+    expect_ok!(parse, interner, "123456789", Value::new_integer(123456789));
+    expect_ok!(parse, interner, "-123456789", Value::new_integer(-123456789));
 
     expect_error!(parse, "123b456789", 3);
     expect_error!(parse, "123456789c", 9);
     expect_error!(parse, "00-7", 2);
-    expect_ok!(parse, "a123456789", Value::new_symbol("a123456789"));
-    expect_ok!(parse, "--7", Value::new_symbol("--7"));
+    expect_ok!(parse, interner, "a123456789", Value::new_symbol(interner.intern("a123456789")));
+    expect_ok!(parse, interner, "--7", Value::new_symbol(interner.intern("--7")));
 }
 
 #[test]
 fn symbol() {
-    expect_ok!(parse, "+", Value::new_symbol("+"));
-    expect_ok!(parse, "-", Value::new_symbol("-"));
-    expect_ok!(parse, "#", Value::new_symbol("#"));
-    expect_ok!(parse, "a1a", Value::new_symbol("a1a"));
-    expect_ok!(parse, "num->str", Value::new_symbol("num->str"));
-    expect_ok!(parse, "//", Value::new_symbol("//"));
+    let interner = &mut StringInterner::new();
+    expect_ok!(parse, interner, "+", Value::new_symbol(interner.intern("+")));
+    expect_ok!(parse, interner, "-", Value::new_symbol(interner.intern("-")));
+    expect_ok!(parse, interner, "#", Value::new_symbol(interner.intern("#")));
+    expect_ok!(parse, interner, "a1a", Value::new_symbol(interner.intern("a1a")));
+    expect_ok!(parse, interner, "num->str", Value::new_symbol(interner.intern("num->str")));
+    expect_ok!(parse, interner, "//", Value::new_symbol(interner.intern("//")));
 
     // error is at 1 bc lexer tries to lex integer
     expect_error!(parse, "1a", 1);
@@ -164,8 +149,8 @@ fn string() {
     macro_rules! expect_str_ok {
         ($s:expr, $e:expr) => ({
             let s = q($s);
-            println!("string: {}", s);
-            expect_ok!(parse, s, Value::new_string($e));
+            let interner = &mut StringInterner::new();
+            expect_ok!(parse, interner, s, Value::new_string($e));
         });
 
         ($s:expr) => (expect_str_ok!($s, $s));
@@ -187,12 +172,13 @@ fn string() {
 
 #[test]
 fn pair() {
+    let interner = &mut StringInterner::new();
     let t = Value::new_bool(true);
     let f = Value::new_bool(false);
     let e = Value::empty_list();
 
-    expect_ok!(parse, "(true . false)", Value::new_pair(t.clone(), f.clone()));
-    expect_ok!(parse, "(true . (false . ()))", Value::new_pair(t, Value::new_pair(f.clone(), e.clone())));
+    expect_ok!(parse, interner, "(true . false)", Value::new_pair(t.clone(), f.clone()));
+    expect_ok!(parse, interner, "(true . (false . ()))", Value::new_pair(t, Value::new_pair(f.clone(), e.clone())));
 
     expect_error!(parse, "(1 .)", 4);
     expect_error!(parse, "(. 2)", 1);
@@ -203,21 +189,26 @@ fn pair() {
 
 #[test]
 fn list() {
-    expect_ok!(parse, "()", Value::empty_list());
-    expect_ok!(parse, r#"(1 "2" (3 . 4))"#, Value::new_list(&vec![Value::new_integer(1), Value::new_string("2"), Value::new_pair(Value::new_integer(3), Value::new_integer(4))]));
-    expect_ok!(parse, "(() ())", Value::new_list(&vec![Value::empty_list(), Value::empty_list()]));
+    let interner = &mut StringInterner::new();
+    expect_ok!(parse, interner, "()", Value::empty_list());
+    expect_ok!(parse, interner, r#"(1 "2" (3 . 4))"#, Value::new_list(&vec![Value::new_integer(1), Value::new_string("2"), Value::new_pair(Value::new_integer(3), Value::new_integer(4))]));
+    expect_ok!(parse, interner, "(() ())", Value::new_list(&vec![Value::empty_list(), Value::empty_list()]));
 
     expect_error!(parse, "(( ())");
 }
 
 #[test]
 fn quote() {
-    fn quoted(v: Value) -> Value { Value::new_list(&[Value::new_symbol("quote"), v]) }
-    expect_ok!(parse, "'()", quoted(Value::empty_list()));
-    expect_ok!(parse, "'1", quoted(Value::new_integer(1)));
-    expect_ok!(parse, "'true", quoted(Value::new_bool(true)));
-    expect_ok!(parse, r#"'"2""#, quoted(Value::new_string("2")));
-    expect_ok!(parse, "'#\\a", quoted(Value::new_char('a')));
-    expect_ok!(parse, "'sym", quoted(Value::new_symbol("sym")));
-    expect_ok!(parse, "'(1 2)", quoted(Value::new_list(&[Value::new_integer(1), Value::new_integer(2)])));
+    fn quoted(v: Value, interner: &mut StringInterner) -> Value {
+        let quote_id = interner.intern("quote");
+        Value::new_list(&[Value::new_symbol(quote_id), v])
+    }
+    let interner = &mut StringInterner::new();
+    expect_ok!(parse, interner, "'()", quoted(Value::empty_list(), interner));
+    expect_ok!(parse, interner, "'1", quoted(Value::new_integer(1), interner));
+    expect_ok!(parse, interner, "'true", quoted(Value::new_bool(true), interner));
+    expect_ok!(parse, interner, r#"'"2""#, quoted(Value::new_string("2"), interner));
+    expect_ok!(parse, interner, "'#\\a", quoted(Value::new_char('a'), interner));
+    expect_ok!(parse, interner, "'sym", quoted(Value::new_symbol(interner.intern("sym")), interner));
+    expect_ok!(parse, interner, "'(1 2)", quoted(Value::new_list(&[Value::new_integer(1), Value::new_integer(2)]), interner));
 }
