@@ -1,4 +1,3 @@
-use std::fmt;
 use std::rc::Rc;
 use std::borrow::Cow;
 use std::mem;
@@ -205,7 +204,7 @@ impl ValueData {
             &ValueData::Pair(ref a, ref b) => format!("({} . {})", a.to_string(interner), b.to_string(interner)),
             &ValueData::EmptyList => format!("()"),
             &ValueData::NativeProc(x) => format!("[NATIVE_PROC: {:?}]", x),
-            &ValueData::Proc(ref p) => format!("[PROC: {}]", p),
+            &ValueData::Proc(ref p) => format!("[PROC: {}]", p.to_string(interner)),
         }
     }
 }
@@ -246,24 +245,19 @@ impl Proc {
         interpreter.current_scope = old_scope;
         res
     }
-}
 
-impl fmt::Display for Proc {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-
-        write!(f, "[PROC]")
-        /* TODO
+    fn to_string(&self, interner: &StringInterner) -> String {
         let mut bindings: String = "(".into();
-        for b in self.bindings.iter().take(self.bindings.len()-1) {
+        let bindings_iter = &mut self.bindings.iter().flat_map(|&b| interner.lookup(b));
+        for b in bindings_iter.take(self.bindings.len() - 1) {
             bindings.push_str(b);
             bindings.push(' ');
         }
-        bindings.push_str(self.bindings.last().unwrap_or(&String::new()));
+        bindings.push_str(bindings_iter.next().unwrap_or(&String::new()));
         bindings.push(')');
 
-        let name = self.name.as_ref().and_then(Value::get_symbol).unwrap_or("lambda");
-        write!(f, "({} {} {})", name, bindings, self.code)
-        */
+        let name = self.name.as_ref().map(|x| &**x).unwrap_or("lambda");
+        format!("({} {} {})", name, bindings, self.code.to_string(interner))
     }
 }
 
