@@ -11,9 +11,10 @@ fn whatever(x: &ParseError<usize, Token, Error>) -> usize {
     match x {
         &ParseError::InvalidToken{location: pos} => pos,
         &ParseError::UnrecognizedToken{expected: _, token: Some((pos, _, _))} => pos,
-        &ParseError::User{error: Error::UnexpectedToken(x)} => x,
-        &ParseError::User{error: Error::UnexpectedEof} => EOF,
-        &ParseError::User{error: Error::InvalidCharacter(x)} => x,
+        &ParseError::User{error: Error::InvalidToken(_, end)} => end,
+        &ParseError::User{error: Error::UnexpectedEofString(_)} => EOF,
+        &ParseError::User{error: Error::UnexpectedEofChar(_)} => EOF,
+        &ParseError::User{error: Error::NonAsciiChar(x)} => x,
         x => panic!("got: {:?}", x),
     }
 }
@@ -102,8 +103,8 @@ fn char() {
     expect_ok!(parse, interner, r"#\\t", Value::new_char('\t'));
     expect_ok!(parse, interner, r"#\\n", Value::new_char('\n'));
     expect_ok!(parse, interner, r"#\\", Value::new_char('\\'));
-    expect_ok!(parse, interner, r"#\", Value::new_symbol(interner.intern(r"#\")));
 
+    expect_error!(parse, r"#\", EOF);
     expect_error!(parse, "#\\\0", 2);
 }
 
@@ -138,17 +139,14 @@ fn symbol() {
 
 #[test]
 fn string() {
-    use std::iter;
     fn q(s: &str) -> String {
-        iter::once('"')
-        .chain(s.chars())
-        .chain(iter::once('"'))
-        .collect()
+        format!("\"{}\"", s)
     }
 
     macro_rules! expect_str_ok {
         ($s:expr, $e:expr) => ({
             let s = q($s);
+            println!("testing: {}", s);
             let interner = &mut StringInterner::new();
             expect_ok!(parse, interner, s, Value::new_string($e));
         });
@@ -211,4 +209,11 @@ fn quote() {
     expect_ok!(parse, interner, "'#\\a", quoted(Value::new_char('a'), interner));
     expect_ok!(parse, interner, "'sym", quoted(Value::new_symbol(interner.intern("sym")), interner));
     expect_ok!(parse, interner, "'(1 2)", quoted(Value::new_list(&[Value::new_integer(1), Value::new_integer(2)]), interner));
+}
+
+#[test]
+fn everything_together() {
+    let interner = &mut StringInterner::new();
+    let string = r#"("hi" my "NaMe" #\i #\s false -42 # #\\n)"#;
+    assert_eq!(parse(string, interner).unwrap().to_string(interner), r#"("hi" my "NaMe" i s false -42 # #\\n)"#)
 }

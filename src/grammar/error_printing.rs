@@ -102,7 +102,7 @@ fn unexpected_eof(input: &str) -> String {
 
 fn tokenizer_error(input: &str, err: &Error) -> String {
     let strs = match err {
-        &Error::InvalidCharacter(pos) => {
+        &Error::NonAsciiChar(pos) => {
             // find char at position
             let c = input[pos..].chars().next().expect("internal error");
             vec![
@@ -111,16 +111,26 @@ fn tokenizer_error(input: &str, err: &Error) -> String {
                 "".into(),
             ]
         },
-        &Error::UnexpectedEof => vec![
-            print_line_with_pos(input, input.len(), input.len()),
+        &Error::UnexpectedEofString(start) => vec![
+            print_line_with_pos(input, start, input.len()),
             print_error_msg(&format!("unexpected EOF\n")),
             print_hint_msg("missing closing \", did you forget to terminate a string literal?")
         ],
-        &Error::UnexpectedToken(pos) => {
-            // find char at position
-            let c = input[pos..].chars().next().expect("internal error");
+        &Error::UnexpectedEofChar(start) => vec![
+            print_line_with_pos(input, start, input.len()),
+            print_error_msg(&format!("unexpected EOF\n")),
+            print_hint_msg("missing a character, did you forget to finish a char literal?")
+        ],
+        &Error::InvalidToken(start, end) => {
             vec![
-                print_error_msg(&format!("unexpected token: '{}'", c)),
+                print_line_with_pos(input, start, end),
+                print_error_msg(&format!("invalid token")),
+            ]
+        },
+        &Error::InvalidEscape(start, end) => {
+            vec![
+                print_line_with_pos(input, start, end),
+                print_error_msg(&format!("invalid escape sequence")),
             ]
         },
     };

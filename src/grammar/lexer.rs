@@ -1,7 +1,6 @@
 use std::str::CharIndices;
 use std::ascii::AsciiExt;
 use std::iter::Peekable;
-use std::ops::Range;
 
 macro_rules! my_try {
     ($e:expr) => ({
@@ -25,19 +24,46 @@ pub enum Token<'input> {
     Symbol(&'input str),
 }
 
+// Tokenzer state
+#[derive(Debug, Clone, Copy)]
+enum State<'input> {
+    // start
+    NewToken,
+    Finished(Spanned<Token<'input>>),
+    // start
+    EatInteger(usize),
+    WhiteSpace(usize),
+    Minus(usize),
+    Symbol(usize),
+    StringStart(usize),
+    StringBackslash(usize),
+    Pound(usize),
+    CharBegin(usize),
+    EscapedChar(usize),
+    FinishedChar(usize, char),
+}
+use self::State::*;
+
 #[derive(Debug)]
 pub struct Tokenizer<'input> {
     text: &'input str,
     chars: Peekable<CharIndices<'input>>,
+    state: State<'input>,
 }
 
 pub type Spanned<T> = (usize, T, usize);
 
 #[derive(Debug)]
 pub enum Error {
-    InvalidCharacter(usize),
-    UnexpectedToken(usize),
-    UnexpectedEof,
+    // pos of invalid char
+    NonAsciiChar(usize),
+
+    // start..end
+    InvalidEscape(usize, usize),
+    InvalidToken(usize, usize),
+    // start
+    UnexpectedEofString(usize),
+    UnexpectedEofChar(usize),
 }
 
 impl<'input> Tokenizer<'input> {
@@ -45,6 +71,7 @@ impl<'input> Tokenizer<'input> {
         Tokenizer {
             text: text,
             chars: text.char_indices().peekable(),
+            state: NewToken,
         }
     }
 
@@ -55,106 +82,6 @@ impl<'input> Tokenizer<'input> {
     fn peek_next(&mut self) -> Option<&(usize, char)> {
         self.chars.peek()
     }
-
-    // consumes all tokens until f returns true.
-    // leaves the token for which f returned true in self.chars()
-    fn eat_until<F: Fn(char) -> bool>(&mut self, start: usize, f: F) -> &'input str {
-        match self.eat_until_strict(start, f) {
-            Ok(x) => x,
-            Err(_) => &self.text[start..],
-        }
-    }
-
-    // same as eat_until, but returns an error if eof was encountered before f returned true
-    fn eat_until_strict<F: Fn(char) -> bool>(&mut self, start: usize, f: F) -> Result<&'input str, Error> {
-        while let Some(&(pos, c)) = self.peek_next() {
-            if f(c) {
-                return Ok(&self.text[start..pos]);
-            } else {
-                self.next_char(); //bump
-            }
-        }
-        Err(Error::UnexpectedEof)
-    }
-
-    fn token_at(at: Range<usize>, tok: Token) -> Option<Result<Spanned<Token>, Error>> {
-        Some(Ok((at.start, tok, at.end)))
-    }
-
-    fn parse_char(&mut self, start: usize) -> Option<Result<Spanned<Token<'input>>, Error>> {
-        let s = self.eat_until(start, |c| end_of_item(c) && c != ')');
-        match s.chars().count() {
-            l @ 1...2 => {
-                let r = start..start+l;
-                Tokenizer::token_at(r.clone(), Token::Symbol(&self.text[r]))
-            },
-            3 => {
-                let c = s.chars().skip(2).next().unwrap();
-                if valid_char(c) {
-                    Tokenizer::token_at(start..start+4, Token::Char(c))
-                } else {
-                    Some(Err(Error::UnexpectedToken(start+2)))
-                }
-            },
-            4 => {
-                let token = match s {
-                    r"#\\n" => Token::Char('\n'),
-                    r"#\\t" => Token::Char('\t'),
-                    r"#\\s" => Token::Char(' '),
-                    _ => return Some(Err(Error::UnexpectedToken(start+2))),
-                };
-                Tokenizer::token_at(start+2..start+4, token)
-            },
-            _ => Some(Err(Error::UnexpectedToken(start+2))),
-        }
-    }
-
-    fn parse_integer(&mut self, start: usize) -> Option<Result<Spanned<Token<'input>>, Error>> {
-        let int_slice = self.eat_until(start, end_of_item);
-        for (pos, c) in int_slice.char_indices() {
-            if !numeric(c) {
-                if pos == 0 && c == '-' { continue }
-                return Some(Err(Error::UnexpectedToken(pos)));
-            }
-        }
-        let num: i64 = int_slice.parse().unwrap();
-        Tokenizer::token_at(start..start+int_slice.len(), Token::Integer(num))
-    }
-
-    fn parse_symbol(&mut self, start: usize) -> Option<Result<Spanned<Token<'input>>, Error>> {
-        let symbol = self.eat_until(start, end_of_item);
-        Tokenizer::token_at(start..start+symbol.len(), Token::Symbol(symbol))
-    }
-
-    fn parse_string(&mut self, start: usize) -> Option<Result<Spanned<Token<'input>>, Error>> {
-        let mut str_len = 0;
-        loop {
-            match self.eat_until_strict(start + str_len, |c| c == '"') {
-                Ok(substr) => {
-                    self.next_char(); // bump so that '"' is skipped in next iteration/token
-
-                    let mut rev_iter = substr.chars().rev().map(|x| x == '\\');
-                    let last_was_slash = rev_iter.next().unwrap_or(false);
-                    let second_last_was_slash = rev_iter.next().unwrap_or(false);
-
-                    if last_was_slash && !second_last_was_slash {
-                        str_len += substr.len() + 1; // + 1: include '"'
-                    } else {
-                        str_len += substr.len();
-                        let s = &self.text[start..start+str_len];
-                        // check for ascii only strings (for now)
-                        for (pos, c) in s.char_indices() {
-                            if !c.is_ascii() {
-                                return Some(Err(Error::InvalidCharacter(start + pos)));
-                            }
-                        }
-                        return Tokenizer::token_at(start..start+str_len, Token::String(s));
-                    }
-                }
-                Err(x) => return Some(Err(x)),
-            };
-        }
-    }
 }
 
 impl<'input> Iterator for Tokenizer<'input> {
@@ -162,34 +89,103 @@ impl<'input> Iterator for Tokenizer<'input> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match self.next_char() {
-                Some((s, '(')) => return Tokenizer::token_at(s..s+1, Token::OpenParen),
-                Some((s, ')')) => return Tokenizer::token_at(s..s+1, Token::ClosingParen),
-                Some((s, '\'')) => return Tokenizer::token_at(s..s+1, Token::Quote),
-                Some((s, '.')) => return Tokenizer::token_at(s..s+1, Token::Dot),
-                Some((s, '#')) => return self.parse_char(s),
-                // special case '-'
-                Some((start, '-')) => {
-                    if let Some(&(_, c)) = self.peek_next() {
-                        // we got a number
-                        if numeric(c) {
-                            return self.parse_integer(start);
+            let next;
+            match self.peek_next() {
+                Some(&(pos, c)) => next = (self.state, pos, c),
+                // check if we still need something
+                None => {
+                    let last_token = match self.state {
+                        Minus(start) => Ok((start, Token::Symbol(&self.text[start..]), self.text.len())),
+                        Pound(start) => Ok((start, Token::Symbol(&self.text[start..]), self.text.len())),
+                        EatInteger(start) => Ok((start, Token::Integer(self.text[start..].parse().unwrap()), self.text.len())),
+                        Symbol(start) => Ok((start, Token::Symbol(&self.text[start..]), self.text.len())),
+                        EscapedChar(start) => Ok((start, Token::Char('\\'), self.text.len())),
+                        FinishedChar(start, x) => Ok((start, Token::Char(x), self.text.len())),
+                        WhiteSpace(start) => Ok((start, Token::WhiteSpace, self.text.len())),
+                        NewToken => return None,
+                        StringStart(_) => Err(Error::UnexpectedEofString(self.text.len())),
+                        StringBackslash(_) => Err(Error::UnexpectedEofString(self.text.len())),
+                        CharBegin(_) => Err(Error::UnexpectedEofChar(self.text.len())),
+                        Finished(_) => unreachable!(),
+                    };
+                    // fuse iterator
+                    self.state = NewToken;
+                    return Some(last_token);
+                },
+            }
+
+            self.state = match next {
+                // pos + 1 is safe, because all these chars have width 1 byte
+                (NewToken, pos, '(') => { self.next_char(); Finished((pos, Token::OpenParen, pos+1)) },
+                (NewToken, pos, ')') => { self.next_char(); Finished((pos, Token::ClosingParen, pos+1)) },
+                (NewToken, pos, '\'') => { self.next_char(); Finished((pos, Token::Quote, pos+1)) },
+                (NewToken, pos, '.') => { self.next_char(); Finished((pos, Token::Dot, pos+1)) },
+                (NewToken, pos, '-') => Minus(pos),
+                (NewToken, pos, '"') => StringStart(pos),
+                (NewToken, pos, '#') => Pound(pos),
+                (NewToken, pos, c) if whitespace(c) => WhiteSpace(pos),
+                (NewToken, pos, c) if numeric(c) => EatInteger(pos),
+                (NewToken, pos, _) => Symbol(pos),
+
+                // minus special case
+                (Minus(start), _, c) if numeric(c) => EatInteger(start),
+                (Minus(start), end, c) if end_of_item(c) => Finished((start, Token::Symbol(&self.text[start..end]), end)),
+                (Minus(start), _, _) => Symbol(start),
+
+                // whitespace
+                (WhiteSpace(pos), _, c) if whitespace(c) => WhiteSpace(pos),
+                (WhiteSpace(start), end, _) => Finished((start, Token::WhiteSpace, end)),
+
+                // chars
+                (Pound(pos), _, '\\') => CharBegin(pos),
+                (Pound(pos), _, _) => Symbol(pos),
+
+                (CharBegin(pos), _, '\\') => EscapedChar(pos),
+                (CharBegin(pos), _, c) if printable_char(c) => FinishedChar(pos, c),
+                (CharBegin(_), pos, _) => return Some(Err(Error::NonAsciiChar(pos))),
+
+                (EscapedChar(pos), _, c) if unescape_char(c).is_some() => FinishedChar(pos, unescape_char(c).unwrap()),
+                (EscapedChar(start), end, _) => return Some(Err(Error::InvalidEscape(start+2, next_char(&self.text, end)))), // +2 bc #\ is 2 bytes
+
+                (FinishedChar(start, x), end, c) if end_of_item(c) => Finished((start, Token::Char(x), end)),
+                (FinishedChar(_, _), end, _) => return Some(Err(Error::InvalidToken(end, end))),
+
+                // integers
+                (EatInteger(start), _, c) if numeric(c) => EatInteger(start),
+                (EatInteger(start), pos, c) if end_of_item(c) =>
+                    // safe because we checked that text[start..pos] is a valid number
+                    Finished((start, Token::Integer(self.text[start..pos].parse().unwrap()), pos)),
+                (EatInteger(_), pos, _) => return Some(Err(Error::InvalidToken(pos, pos))),
+
+                // strings
+                (StringStart(start), end, '"') => {
+                    self.next_char(); // bump
+                    let string = &self.text[start+1..end];
+                    for (i, c) in string.char_indices() {
+                        if !c.is_ascii() {
+                            return Some(Err(Error::NonAsciiChar(i+1))) // +1 bc start+1 above
                         }
                     }
-                    return self.parse_symbol(start);
+                    Finished((start, Token::String(string), end))
                 },
-                // number
-                Some((start, x)) if numeric(x) => return self.parse_integer(start),
-                // whitespace
-                Some((start, x)) if whitespace(x) => {
-                    let len = self.eat_until(start, |c| !whitespace(c)).len();
-                    return Tokenizer::token_at(start..len, Token::WhiteSpace);
+                (StringStart(start), _, '\\') => StringBackslash(start),
+                (StringStart(start), _, _) => StringStart(start),
+                (StringBackslash(start), _, '"') => StringStart(start),
+                (StringBackslash(start), _, c) if unescape_char(c).is_some() => StringStart(start),
+                (StringBackslash(_), pos, _) => return Some(Err(Error::InvalidEscape(pos-1, next_char(&self.text, pos)))), // -1 bc \ is 1 byte
+
+                // symbols
+                (Symbol(start), end, c) if end_of_item(c) => Finished((start, Token::Symbol(&self.text[start..end]), end)),
+                (Symbol(start), _, _) => Symbol(start),
+                (Finished(_), _, _) => unreachable!(),
+            };
+
+            match self.state {
+                Finished(token) => {
+                    self.state = NewToken;
+                    return Some(Ok(token))
                 },
-                // string, + 1 bc we don't need the '"' in string content
-                Some((start, '"')) => return self.parse_string(start+1),
-                // symbol
-                Some((start, _)) => return self.parse_symbol(start),
-                None => return None,
+                _  => { self.next_char(); }, // bump
             }
         }
     }
@@ -206,11 +202,25 @@ fn end_of_item(x: char) -> bool {
     x == ')'
 }
 
+fn unescape_char(x: char) -> Option<char> {
+    match x {
+        'n' => Some('\n'),
+        's' => Some(' '),
+        't' => Some('\t'),
+        '\\' => Some('\\'),
+        _ => None,
+    }
+}
+
+fn next_char(text: &str, pos: usize) -> usize {
+    pos + char::len_utf8(text.as_bytes()[pos] as char)
+}
+
 fn numeric(x: char) -> bool {
     '0' <= x && x <= '9'
 }
 
-fn valid_char(x: char) -> bool {
+fn printable_char(x: char) -> bool {
     x >= '!' &&
     x <= '~'
 }
