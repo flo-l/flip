@@ -43,10 +43,13 @@ What works so far, in no particular order and incomplete:
 
 - GC: No, just Rc for all values
 
+- Dynamic scopes
+  - let and let* are supported
+  - They behave as their counterparts in eg. Racket and probably most other schemes
+
 Planned:
 
 - Conditions
-- Dynamic scopes (let etc.)
 - Refactor Value so that it doesn't use Rc for everything, just Strings and Pairs maybe
 - Float support
 - Maybe a better tokenizer with nom
