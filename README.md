@@ -46,10 +46,15 @@ What works so far, in no particular order and incomplete:
 - Dynamic scopes
   - (let (x 1 y 2 z (+ x y)) (list x y z)) gives you (1 2 3)
   - let behaves like let* in clojure
+  - there's also loop, which works like let, but establishes a recursion point, see clojure docs
 
 - Tail calls
   - (recur arg1 arg2 ..) will make a tail call
   - works the same as in clojure
+  - recur should only be used in tail position
+  - when recur is evaluated, code execution jumps to the next recursion point
+  - lambda and loop both create a recursion point
+  - example: (loop (x 1) (if (< x 10) (recur (+ x 1)) x )) this is a tail-call-optimized loop that counts from 1 to 10
 
 Planned:
 

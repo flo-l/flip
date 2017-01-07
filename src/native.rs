@@ -127,7 +127,7 @@ pub fn lambda(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     Value::new_proc(name, interpreter.current_scope.clone(), bindings, code)
 }
 
-// This bahves like let* in scheme
+// This behaves like let* in clojure
 pub fn let_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("let*", args.len(), 2);
     let binding_list = try_unwrap_type!("let*", "list", Value::get_list, &args[0], interpreter);
@@ -146,6 +146,52 @@ pub fn let_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 
     // evaluate body with new scope and bindings
     let res = interpreter.evaluate(&args[1]);
+
+    // restore old scope
+    interpreter.current_scope = parent_scope;
+
+    res
+}
+
+// This behaves like loop in clojure
+pub fn loop_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    check_arity!("loop", args.len(), 2);
+    let binding_list: Vec<Value> = try_unwrap_type!("loop", "list", Value::get_list, &args[0], interpreter);
+    assert_or_condition!(binding_list.len() % 2 == 0, "bindings must be a list with an even number of objects");
+
+    let mut binding_names = Vec::with_capacity(binding_list.len() / 2);
+    let mut binding_values = Vec::with_capacity(binding_list.len() / 2);
+    for binding in binding_list.chunks(2) {
+        let binding_name = try_unwrap_type!("loop", "symbol", Value::get_symbol, &binding[0], interpreter);
+        let binding_value = interpreter.evaluate(&binding[1]);
+        binding_names.push(binding_name);
+        binding_values.push(binding_value);
+    }
+
+    // replace interpreter scope with fresh child scope
+    let parent_scope = interpreter.current_scope.clone();
+    interpreter.current_scope = parent_scope.new_child();
+
+    let mut res;
+    loop {
+        // bind values in fresh scope
+        for (&binding_name, binding_value) in binding_names.iter().zip(binding_values.iter()) {
+            interpreter.current_scope.add_symbol(binding_name, binding_value.clone());
+        }
+
+        // evaluate body with new scope and bindings
+        res = interpreter.evaluate(&args[1]);
+
+        // check for recursion
+        if let Some(args) = res.get_recur() {
+            interpreter.recur_lock = false;
+            check_arity!("loop", args.len(), binding_values.len() as u32);
+            binding_values = args.iter().cloned().collect();
+            continue;
+        }
+
+        break;
+    }
 
     // restore old scope
     interpreter.current_scope = parent_scope;
@@ -190,7 +236,8 @@ eval_args!(fn begin(args: &mut [Value]) -> Value {
 });
 
 // Creates a recur with the supplied arguments
-eval_args!(fn recur(args: &mut [Value]) -> Value {
+eval_args!(fn recur(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    interpreter.recur_lock = true;
     Value::new_recur(args.iter().cloned().collect())
 });
 

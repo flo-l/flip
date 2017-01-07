@@ -247,6 +247,7 @@ impl Proc {
 
             // check for recursion
             if let Some(args) = res.get_recur() {
+                interpreter.recur_lock = false;
                 check_arity!("recur", args.len(), evaluated_args.len() as u32);
                 evaluated_args = args.iter().cloned().collect();
                 continue;

@@ -6,6 +6,7 @@ use ::string_interner::StringInterner;
 pub struct Interpreter {
     pub interner: StringInterner,
     pub current_scope: Scope,
+    pub recur_lock: bool,
 }
 
 impl Interpreter {
@@ -13,6 +14,7 @@ impl Interpreter {
         let mut interpreter = Interpreter {
             interner: StringInterner::new(),
             current_scope: Scope::new(),
+            recur_lock: false,
         };
         interpreter.init();
         interpreter
@@ -26,6 +28,7 @@ impl Interpreter {
         self.add_str_to_current_scope("eq?", Value::new_native_proc(native::poly_eq));
         self.add_str_to_current_scope("lambda", Value::new_native_proc(native::lambda));
         self.add_str_to_current_scope("let", Value::new_native_proc(native::let_));
+        self.add_str_to_current_scope("loop", Value::new_native_proc(native::loop_));
         self.add_str_to_current_scope("begin", Value::new_native_proc(native::begin));
         self.add_str_to_current_scope("recur", Value::new_native_proc(native::recur));
 
@@ -68,8 +71,10 @@ impl Interpreter {
     }
 
     pub fn evaluate(&mut self, value: &Value) -> Value {
-        let mut res: Value;
-        if let Some(mut list) = value.get_list() {
+        let res: Value;
+        if self.recur_lock {
+            res = Value::new_condition(Value::new_string("recur in non-tail position"));
+        } else if let Some(mut list) = value.get_list() {
             if list.len() > 0 {
                 let (func, mut args) = list.split_at_mut(1);
                 let func = self.evaluate(&func[0]);
@@ -90,10 +95,6 @@ impl Interpreter {
             .unwrap_or(Value::new_condition(Value::new_string(format!("undefined ident: {}", value.to_string(&self.interner)))));
         } else {
             res = value.clone();
-        }
-
-        if res.get_recur().is_some() {
-            res = Value::new_condition(Value::new_string(format!("recur not in tail position")));
         }
 
         // TODO handle condition properly
