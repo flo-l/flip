@@ -47,6 +47,10 @@ What works so far, in no particular order and incomplete:
   - (let (x 1 y 2 z (+ x y)) (list x y z)) gives you (1 2 3)
   - let behaves like let* in clojure
 
+- Tail calls
+  - (recur arg1 arg2 ..) will make a tail call
+  - works the same as in clojure
+
 Planned:
 
 - Conditions
