@@ -28,6 +28,7 @@ impl Interpreter {
         self.add_str_to_current_scope("let", Value::new_native_proc(native::let_));
         self.add_str_to_current_scope("let*", Value::new_native_proc(native::let_dash));
         self.add_str_to_current_scope("begin", Value::new_native_proc(native::begin));
+        self.add_str_to_current_scope("recur", Value::new_native_proc(native::recur));
 
         self.add_str_to_current_scope("null?", Value::new_native_proc(native::null_));
         self.add_str_to_current_scope("boolean?", Value::new_native_proc(native::boolean_));
@@ -68,7 +69,7 @@ impl Interpreter {
     }
 
     pub fn evaluate(&mut self, value: &Value) -> Value {
-        let res: Value;
+        let mut res: Value;
         if let Some(mut list) = value.get_list() {
             if list.len() > 0 {
                 let (func, mut args) = list.split_at_mut(1);
@@ -90,6 +91,10 @@ impl Interpreter {
             .unwrap_or(Value::new_condition(Value::new_string(format!("undefined ident: {}", value.to_string(&self.interner)))));
         } else {
             res = value.clone();
+        }
+
+        if res.get_recur().is_some() {
+            res = Value::new_condition(Value::new_string(format!("recur not in tail position")));
         }
 
         // TODO handle condition properly

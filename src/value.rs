@@ -37,6 +37,7 @@ impl Value {
         };
         Self::new_with(ValueData::Proc(procedure))
     }
+    pub fn new_recur(args: Vec<Value>) -> Self { Self::new_with(ValueData::Recur(args)) }
 
     fn data(&self) -> &ValueData {
         &*self.val_ptr
@@ -119,6 +120,12 @@ impl Value {
         }
     }
 
+    pub fn get_recur(&self) -> Option<&[Value]> {
+        match self.data() {
+            &ValueData::Recur(ref args) => Some(&*args),
+            _ => None,
+        }
+    }
     pub fn new_list(elements: &[Value]) -> Value {
         if elements.len() == 0 { return Value::empty_list(); }
         let mut iter = elements.into_iter().rev();
@@ -171,6 +178,7 @@ enum ValueData {
     Condition(Value),
     NativeProc(*const ()),
     Proc(Proc),
+    Recur(Vec<Value>),
 }
 
 impl ValueData {
@@ -195,6 +203,7 @@ impl ValueData {
             &ValueData::EmptyList => format!("()"),
             &ValueData::NativeProc(x) => format!("[NATIVE_PROC: {:?}]", x),
             &ValueData::Proc(ref p) => format!("[PROC: {}]", p.to_string(interner)),
+            &ValueData::Recur(ref p) => format!("[RECUR: {}]", Value::new_list(&p).to_string(interner)),
         }
     }
 }
@@ -215,23 +224,37 @@ impl Proc {
                 format!("arity mismatch for {}: expected: {}, got: {}", name, self.bindings.len(), args.len())));
         }
 
+        let mut res;
+
         // evaluate args in current scope
-        let evaluated_args: Vec<Value> = args.iter().map(|x| interpreter.evaluate(x)).collect();
-
-        // create new scope for fn from fns parent scope
-        let mut fn_scope = self.parent_scope.new_child();
-
-        // add args to fn scope
-        for (&binding, value) in self.bindings.iter().zip(evaluated_args.into_iter()) {
-            fn_scope.add_symbol(binding, value);
-        }
+        let mut evaluated_args: Vec<Value> = args.iter().map(|x| interpreter.evaluate(x)).collect();
 
         // backup current scope
         let old_scope = interpreter.current_scope.clone(); // this is just one Rc::clone
 
-        // evaluate code in fn scope
-        interpreter.current_scope = fn_scope;
-        let res = interpreter.evaluate(&self.code);
+        // create new scope for fn from fns parent scope
+        interpreter.current_scope = self.parent_scope.new_child();
+
+        // loop for recur
+        loop {
+            // add args to fn scope
+            for (&binding, value) in self.bindings.iter().zip(evaluated_args.iter()) {
+                interpreter.current_scope.add_symbol(binding, value.clone());
+            }
+
+            // evaluate code in fn scope
+            res = interpreter.evaluate(&self.code);
+
+            // check for recursion
+            if let Some(args) = res.get_recur() {
+                check_arity!("recur", args.len(), evaluated_args.len() as u32);
+                evaluated_args = args.iter().cloned().collect();
+                continue;
+            }
+
+            break;
+        }
+
         interpreter.current_scope = old_scope;
         res
     }

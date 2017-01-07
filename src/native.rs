@@ -219,6 +219,11 @@ eval_args!(fn begin(args: &mut [Value]) -> Value {
     args.last().cloned().unwrap()
 });
 
+// Creates a recur with the supplied arguments
+eval_args!(fn recur(args: &mut [Value]) -> Value {
+    Value::new_recur(args.iter().cloned().collect())
+});
+
 // Type checking
 macro_rules! type_checker {
     ($func:ident, $lisp_name:expr, $checking_fn:ident) =>

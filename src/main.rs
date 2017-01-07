@@ -5,13 +5,15 @@ extern crate rustyline;
 extern crate siphasher;
 extern crate lalrpop_util;
 
+#[macro_use]
+mod native;
+
 mod cli;
 mod grammar;
 mod value;
 mod interpreter;
 mod repl;
 mod scope;
-mod native;
 mod string_interner;
 
 use std::io::Read;
