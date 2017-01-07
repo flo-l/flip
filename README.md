@@ -44,8 +44,8 @@ What works so far, in no particular order and incomplete:
 - GC: No, just Rc for all values
 
 - Dynamic scopes
-  - let and let* are supported
-  - They behave as their counterparts in eg. Racket and probably most other schemes
+  - (let (x 1 y 2 z (+ x y)) (list x y z)) gives you (1 2 3)
+  - let behaves like let* in clojure
 
 Planned:
 

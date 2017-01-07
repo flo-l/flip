@@ -26,7 +26,6 @@ impl Interpreter {
         self.add_str_to_current_scope("eq?", Value::new_native_proc(native::poly_eq));
         self.add_str_to_current_scope("lambda", Value::new_native_proc(native::lambda));
         self.add_str_to_current_scope("let", Value::new_native_proc(native::let_));
-        self.add_str_to_current_scope("let*", Value::new_native_proc(native::let_dash));
         self.add_str_to_current_scope("begin", Value::new_native_proc(native::begin));
         self.add_str_to_current_scope("recur", Value::new_native_proc(native::recur));
 
