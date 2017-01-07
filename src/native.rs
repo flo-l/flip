@@ -127,7 +127,8 @@ pub fn lambda(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     Value::new_proc(name, interpreter.current_scope.clone(), bindings, code)
 }
 
-// TODO: use a macro to dedulicate let, let* code
+// the let impls can hardly be deduplicated, because the code modifies different scopes for
+// different lets, which makes writing a macro hard because of aliasing &mut pointers
 pub fn let_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("let", args.len(), 2);
     let binding_list = try_unwrap_type!("let", "list", Value::get_list, &args[0], interpreter);
