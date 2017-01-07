@@ -127,6 +127,35 @@ pub fn lambda(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     Value::new_proc(name, interpreter.current_scope.clone(), bindings, code)
 }
 
+// TODO: use a macro to dedulicate let, let* code
+pub fn let_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    check_arity!("let", args.len(), 2);
+    let binding_list = try_unwrap_type!("let", "list", Value::get_list, &args[0], interpreter);
+
+    // create fresh scope
+    let parent_scope = interpreter.current_scope.clone();
+    let mut new_scope = interpreter.current_scope.new_child();
+
+    // evaluate binding sequentially in parent scope
+    for binding in binding_list.iter() {
+        let binding = try_unwrap_type!("let", "list", Value::get_list, binding, interpreter);
+        assert_or_condition!(binding.len() == 2, "binding for let must be a list with length 2");
+        let binding_name = try_unwrap_type!("let", "symbol", Value::get_symbol, &binding[0], interpreter);
+        let binding_value = interpreter.evaluate(&binding[1]);
+        new_scope.add_symbol(binding_name, binding_value);
+    }
+
+    // evaluate body with new scope (and bindings)
+    interpreter.current_scope = new_scope;
+    let res = interpreter.evaluate(&args[1]);
+
+    // restore old scope
+    interpreter.current_scope = parent_scope;
+
+    res
+}
+
+
 pub fn let_dash(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("let*", args.len(), 2);
     let binding_list = try_unwrap_type!("let*", "list", Value::get_list, &args[0], interpreter);
