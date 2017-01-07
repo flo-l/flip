@@ -27,6 +27,7 @@ impl Interpreter {
         self.add_str_to_current_scope("lambda", Value::new_native_proc(native::lambda));
         self.add_str_to_current_scope("let", Value::new_native_proc(native::let_));
         self.add_str_to_current_scope("let*", Value::new_native_proc(native::let_dash));
+        self.add_str_to_current_scope("begin", Value::new_native_proc(native::begin));
 
         self.add_str_to_current_scope("null?", Value::new_native_proc(native::null_));
         self.add_str_to_current_scope("boolean?", Value::new_native_proc(native::boolean_));

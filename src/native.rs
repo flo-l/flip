@@ -213,6 +213,12 @@ eval_args!(fn poly_eq(args: &mut [Value]) -> Value {
     Value::new_bool(args.windows(2).all(|window| window[0] == window[1]))
 });
 
+// Begin form, for now just evaluates its arguments sequentially and returns the last one
+eval_args!(fn begin(args: &mut [Value]) -> Value {
+    check_arity!("begin", args.len(), min => 1);
+    args.last().cloned().unwrap()
+});
+
 // Type checking
 macro_rules! type_checker {
     ($func:ident, $lisp_name:expr, $checking_fn:ident) =>
