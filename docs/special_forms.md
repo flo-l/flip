@@ -164,6 +164,7 @@ deterministically.
 
 ###Examples
 
+```clojure
     (define count-down (lambda (n)
       (if (= 0 n)
         'done
@@ -192,7 +193,7 @@ deterministically.
     ))
     (fac 6)
       => 720
-
+```
 
 ## begin
 
