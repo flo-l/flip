@@ -72,19 +72,6 @@ pub fn define(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     args[0].clone()
 }
 
-pub fn set(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    check_arity!("set!", args.len(), 2);
-
-    let s = try_unwrap_type!("set!", "symbol", Value::get_symbol, &args[0], interpreter);
-    assert_or_condition!(
-        interpreter.current_scope.lookup_symbol(s).is_some(),
-        format!("set!: unknown identifier {}", args[0].to_string(&interpreter.interner))
-    );
-    let item = interpreter.evaluate(&args[1]);
-    interpreter.current_scope.add_symbol(s, item);
-    args[0].clone()
-}
-
 pub fn if_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("if", args.len(), 3);
 
