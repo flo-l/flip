@@ -34,13 +34,14 @@ overwrites the binding.
 
 ###Examples
 
-    (define a 1)
-    a
-      => 1
-    (define a 42)
-    a
-      => 42
-
+```clojure
+(define a 1)
+a
+  => 1
+(define a 42)
+a
+  => 42
+```
 
 ## quote
 
@@ -53,15 +54,17 @@ This returns `expr` without evaluating it.
 
 ###Examples
 
-    (define a 42)
-    a
-      => 42
-    'a
-      => a
-    b
-      => error: b not defined
-    'b
-      => b
+```clojure
+(define a 42)
+a
+  => 42
+'a
+  => a
+b
+  => error: b not defined
+'b
+  => b
+```
 
 ## if
 
@@ -76,14 +79,16 @@ and returns its result.
 
 ###Examples
 
-  (if true 1 2)
-    => 1
-  (if false 1 2)
-    => 2
-  (if true "no error" undefined_symbol)
-    => "no error"
-  (if false "no error" undefined_symbol)
-    => error: undefined_symbol not defined
+```clojure
+(if true 1 2)
+  => 1
+(if false 1 2)
+  => 2
+(if true "no error" undefined_symbol)
+  => "no error"
+(if false "no error" undefined_symbol)
+  => error: undefined_symbol not defined
+```
 
 ## lambda
 
@@ -104,16 +109,18 @@ is evaluated in the new scope. The return value of `body` is returned and the ne
 
 ###Examples
 
-    (define mul (lambda (x y) (* x y)))
-    mul
-      => [PROC: (lambda (x y) (* x y))
-    (mul 2 3)
-      => 6
+```clojure
+(define mul (lambda (x y) (* x y)))
+mul
+  => [PROC: (lambda (x y) (* x y))
+(mul 2 3)
+  => 6
 
-    (define f (x) (define bla x))
-    (f 12)
-    bla
-      => error: bla not defined
+(define f (x) (define bla x))
+(f 12)
+bla
+  => error: bla not defined
+```
 
 ## let
 
@@ -132,11 +139,13 @@ The value of `body` is returned. The new scope is destroyed afterwards.
 
 ###Examples
 
-    (let (x 1) x)
-      => 1
+```clojure
+(let (x 1) x)
+  => 1
 
-    (let (x 1 y 2 z (+ x y)) (list x y z))
-      => (1 2 3)
+(let (x 1 y 2 z (+ x y)) (list x y z))
+  => (1 2 3)
+```
 
 ##loop
 
@@ -165,34 +174,34 @@ deterministically.
 ###Examples
 
 ```clojure
-    (define count-down (lambda (n)
-      (if (= 0 n)
-        'done
-        (recur (- n 1))
-      )
-    ))
-    (count-down 10000)
-      => done
+(define count-down (lambda (n)
+  (if (= 0 n)
+    'done
+    (recur (- n 1))
+  )
+))
+(count-down 10000)
+  => done
 
-    (define recursive-count-down (lambda (n)
-      (if (= 0 n)
-        'done
-        (recursive-count-down (- n 1))
-      )
-    ))
-    (recursive-count-down 10000)
-      => STACK_OVERFLOW
+(define recursive-count-down (lambda (n)
+  (if (= 0 n)
+    'done
+    (recursive-count-down (- n 1))
+  )
+))
+(recursive-count-down 10000)
+  => STACK_OVERFLOW
 
-    (define fac (lambda (n)
-      (loop (n n res 1)
-        (if (< n 2)
-          res
-          (recur (- n 1) (* res n))
-        )
-      )
-    ))
-    (fac 6)
-      => 720
+(define fac (lambda (n)
+  (loop (n n res 1)
+    (if (< n 2)
+      res
+      (recur (- n 1) (* res n))
+    )
+  )
+))
+(fac 6)
+  => 720
 ```
 
 ## begin
@@ -206,10 +215,12 @@ Evaluates all `expr`essions and `last`, returns the value of `last`.
 
 ###Examples
 
-    (begin 1 2 3)
-      => 3
+```clojure
+(begin 1 2 3)
+  => 3
 
-    (begin (define a 1) 2 3)
-      => 3
-    a
-      => 1
+(begin (define a 1) 2 3)
+  => 3
+a
+  => 1
+```
