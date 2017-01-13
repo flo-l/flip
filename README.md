@@ -1,18 +1,28 @@
-My take on implementing a scheme-like language in Rust
+My take on implementing a lisp-like language in Rust
 ======================
 
 This is just for fun. The code is opensource, because I was looking for similar projects
 before I started and couldn't find many. So feel free to inspire yourself if you want to write
-your own programming language or something similar.
+your own programming language or whatever.
 
-I've taken the liberty of diverging from the official scheme spec wherever I felt like it.
+I initially followed this marvelous guide: [Scheme from Scratch](http://peter.michaux.ca/articles/scheme-from-scratch-introduction).
+
+Afterwards I've taken the liberty of diverging from the official scheme spec wherever I felt like it.
+I didn't implement automatic tail-call-optimization for example. Instead I did it the
+clojure way with `recur`.
 
 I'd love to receive feedback on the code, so if you want to chat about it, ask a question
 or propose an improvement feel free to open an issue on GitHub!
 
-I more or less followed this marvelous guide: [Scheme from Scratch](http://peter.michaux.ca/articles/scheme-from-scratch-introduction).
+###Documentation
+Can be found in the docs folder of the repo.
 
-What works so far, in no particular order and incomplete:
+###Screenshots
+
+![REPL Screenshot](https://cloud.githubusercontent.com/assets/5130545/21939319/84b57bdc-d9bf-11e6-95c8-a769d90e25b3.png)
+
+###Features
+In no particular order and incomplete:
 
 - REPL with history and autocomplete
 
@@ -56,7 +66,7 @@ What works so far, in no particular order and incomplete:
   - lambda and loop both create a recursion point
   - example: (loop (x 1) (if (< x 10) (recur (+ x 1)) x )) this is a tail-call-optimized loop that counts from 1 to 10
 
-Planned:
+###Planned Features
 
 - Conditions
 - Refactor Value so that it doesn't use Rc for everything, just Strings and Pairs maybe
