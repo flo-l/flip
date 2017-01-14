@@ -1,5 +1,6 @@
 use ::lalrpop_util::ParseError;
-use super::lexer::{Token, Error};
+use super::lexer::Token;
+use super::error::Error;
 use std::iter;
 
 pub fn create_error_message(input: &str, err: &ParseError<usize, Token, Error>) -> String {
@@ -18,7 +19,7 @@ pub fn create_error_message(input: &str, err: &ParseError<usize, Token, Error>) 
         } => extra_token(input, left, right),
         &ParseError::User {
             ref error,
-        } => tokenizer_error(input, error),
+        } => user_error(input, error),
     }
 }
 
@@ -100,7 +101,7 @@ fn unexpected_eof(input: &str) -> String {
     ])
 }
 
-fn tokenizer_error(input: &str, err: &Error) -> String {
+fn user_error(input: &str, err: &Error) -> String {
     let strs = match err {
         &Error::NonAsciiChar(pos) => {
             // find char at position
@@ -133,6 +134,11 @@ fn tokenizer_error(input: &str, err: &Error) -> String {
                 print_error_msg(&format!("invalid escape sequence")),
             ]
         },
+        &Error::RecurInNonTailPosition => {
+            vec![
+                print_error_msg(&format!("recur in non-tail position")),
+            ]
+        }
     };
 
     concat_strings(&strs)

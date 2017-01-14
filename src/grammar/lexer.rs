@@ -2,6 +2,8 @@ use std::str::CharIndices;
 use std::ascii::AsciiExt;
 use std::iter::Peekable;
 
+use super::error::Error;
+
 macro_rules! my_try {
     ($e:expr) => ({
         match $e {
@@ -52,19 +54,6 @@ pub struct Tokenizer<'input> {
 }
 
 pub type Spanned<T> = (usize, T, usize);
-
-#[derive(Debug)]
-pub enum Error {
-    // pos of invalid char
-    NonAsciiChar(usize),
-
-    // start..end
-    InvalidEscape(usize, usize),
-    InvalidToken(usize, usize),
-    // start
-    UnexpectedEofString(usize),
-    UnexpectedEofChar(usize),
-}
 
 impl<'input> Tokenizer<'input> {
     pub fn new(text: &'input str) -> Tokenizer<'input> {

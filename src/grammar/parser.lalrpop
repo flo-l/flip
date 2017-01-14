@@ -2,7 +2,8 @@ use std::iter;
 use ::value::Value;
 use ::string_interner::StringInterner;
 use ::grammar::lexer::unescape_string;
-use super::lexer::{Token, Error};
+use super::lexer::Token;
+use super::error::Error;
 
 grammar<'input>(text: &'input str, interner_valid: bool, interner: &mut StringInterner);
 
