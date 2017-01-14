@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::borrow::Cow;
 use std::mem;
 use std::char;
+use itertools::Itertools;
 use ::interpreter::Interpreter;
 use ::scope::Scope;
 use ::string_interner::StringInterner;
@@ -28,7 +29,7 @@ impl Value {
         let raw: *const () = f as *const ();
         Self::new_with(ValueData::NativeProc(raw))
     }
-    pub fn new_proc(name: Option<String>, parent_scope: Scope, bindings: Vec<u64>, code: Value) -> Self {
+    pub fn new_proc(name: Option<String>, parent_scope: Scope, bindings: Vec<u64>, code: Vec<Value>) -> Self {
         let procedure = Proc {
             name: name,
             parent_scope: parent_scope,
@@ -189,17 +190,18 @@ impl ValueData {
             &ValueData::Integer(x) => format!("{}", x),
             &ValueData::Symbol(id) => format!("{}", interner.lookup(id).unwrap_or(&format!("[SYMBOL: {}]", id.to_string()))),
             &ValueData::String(ref x) => format!("\"{}\"", x),
-            &ValueData::Pair(ref a, ref b) if b.get_pair().is_some() || b.get_empty_list().is_some() => {
-                let iter = ListIter::new(b);
-                let mut res = format!("({}", a.to_string(interner));
-                for x in iter {
-                    res.push_str(&format!(" {}", x.to_string(interner)));
-                }
-                res.push(')');
-                res
+            &ValueData::Pair(ref a, ref b) if b.get_empty_list().is_some() => {
+                format!("({})", a.to_string(interner))
             },
-            &ValueData::Condition(ref x) => format!("[CONDITION: {:?}]", x),
+            &ValueData::Pair(ref a, ref b) if b.get_pair().is_some() => {
+                let rest = ListIter::new(b)
+                .map(|x| x.to_string(interner))
+                .join(" ");
+
+                format!("({} {})", a.to_string(interner), rest)
+            },
             &ValueData::Pair(ref a, ref b) => format!("({} . {})", a.to_string(interner), b.to_string(interner)),
+            &ValueData::Condition(ref x) => format!("[CONDITION: {:?}]", x),
             &ValueData::EmptyList => format!("()"),
             &ValueData::NativeProc(x) => format!("[NATIVE_PROC: {:?}]", x),
             &ValueData::Proc(ref p) => format!("[PROC: {}]", p.to_string(interner)),
@@ -213,7 +215,7 @@ pub struct Proc {
     name: Option<String>,
     parent_scope: Scope,
     bindings: Vec<u64>,
-    code: Value,
+    code: Vec<Value>,
 }
 
 impl Proc {
@@ -243,7 +245,17 @@ impl Proc {
             }
 
             // evaluate code in fn scope
-            res = interpreter.evaluate(&self.code);
+            for body in self.code.iter().take(self.code.len() - 1) {
+                let res = interpreter.evaluate(body);
+
+                // check for invalid recursion
+                if let Some(_) = res.get_recur() {
+                    interpreter.recur_lock = false;
+                    raise_condition!("recur in non-tail position")
+                }
+            }
+
+            res = interpreter.evaluate(&self.code.last().unwrap()); // safe because of arity check
 
             // check for recursion
             if let Some(args) = res.get_recur() {
@@ -261,17 +273,17 @@ impl Proc {
     }
 
     fn to_string(&self, interner: &StringInterner) -> String {
-        let mut bindings: String = "(".into();
-        let bindings_iter = &mut self.bindings.iter().flat_map(|&b| interner.lookup(b));
-        for b in bindings_iter.take(self.bindings.len() - 1) {
-            bindings.push_str(b);
-            bindings.push(' ');
-        }
-        bindings.push_str(bindings_iter.next().unwrap_or(&String::new()));
-        bindings.push(')');
-
         let name = self.name.as_ref().map(|x| &**x).unwrap_or("lambda");
-        format!("({} {} {})", name, bindings, self.code.to_string(interner))
+
+        let bindings = self.bindings.iter()
+        .flat_map(|&b| interner.lookup(b))
+        .join(" ");
+
+        let code = self.code.iter()
+        .map(|x| x.to_string(interner))
+        .join(" ");
+
+        format!("({} ({}) {})", name, bindings, code)
     }
 }
 

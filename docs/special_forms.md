@@ -11,7 +11,7 @@ The following syntax is used:
 - `(proc args+)` means `proc` takes 1 or more arguments, collectively called `args`.
 - `(proc a rest*)` means `proc` takes 1 or more arguments. Here the first one is called `a`, the rest (if any) `rest`.
 
-##Content
+## Table of Contents
 
 - [define](#define)
 - [quote](#quote)
@@ -32,7 +32,7 @@ The following syntax is used:
 This binds `name` to the value of `expr` in the current scope. If `name` is already bound,
 overwrites the binding.
 
-###Examples
+### Examples
 
 ```clojure
 (define a 1)
@@ -52,7 +52,7 @@ a
 
 This returns `expr` without evaluating it.
 
-###Examples
+### Examples
 
 ```clojure
 (define a 42)
@@ -77,7 +77,7 @@ b
 If `expr` returns true evaluates `then` and returns its result, else it evaluates `else`
 and returns its result.
 
-###Examples
+### Examples
 
 ```clojure
 (if true 1 2)
@@ -92,52 +92,54 @@ and returns its result.
 
 ## lambda
 
-`(lambda name? args body)`
+`(lambda name? args body+)`
 
 - name: a symbol representing the lambdas name
 - args: a list of symbols `(symbol*)`
-- body: some s-expression
+- body: some s-expressions
 
 This creates a new procedure (function, if you want). You can optionally add a
 `name` for debugability. `args` defines the arguments your procedure takes.
 
 When the procedure is called, a new scope is created.
-In this scope, the supplied arguments are bound to the names in `args`. Then `body`
-is evaluated in the new scope. The return value of `body` is returned and the new scope destroyed.
+In this scope, the supplied arguments are bound to the names in `args`. Then each s-expression in `body`
+is evaluated in the new scope. The return value of the last s-expression in `body` is returned and the new scope destroyed.
 
 `lambda` also defines a recursion point, see [recur](#recur) for more info.
 
-###Examples
+### Examples
 
 ```clojure
 (define mul (lambda (x y) (* x y)))
 mul
-  => [PROC: (lambda (x y) (* x y))
+=> [PROC: (lambda (x y) (* x y))]
 (mul 2 3)
-  => 6
+=> 6
 
-(define f (x) (define bla x))
+(define f (lambda (x) (define bla x) bla))
 (f 12)
+ => 12
 bla
   => error: bla not defined
 ```
 
 ## let
 
-`(let bindings body)`
+`(let bindings body+)`
 
 - bindings: a list of bindings of the form: `(binding*)`
 - binding: `name expr` where name is a symbol and expr is some s-expression
-- body: some s-expression
+- body: some s-expressions
 
 This creates a new local scope. It binds the `name`s in `bindings` to the value of their
 respective `expr`essions. The expressions are evaluated in the new scope.
 This happens in order, so you can refer to already bound variables
-in expressions of following variables. `body` is then executed in the new scope.
+in expressions of following variables.
+Each s-expression in `body` is then executed in the new scope.
 
-The value of `body` is returned. The new scope is destroyed afterwards.
+The value of the last s-expression in `body` is returned. The new scope is destroyed afterwards.
 
-###Examples
+### Examples
 
 ```clojure
 (let (x 1) x)
@@ -145,13 +147,16 @@ The value of `body` is returned. The new scope is destroyed afterwards.
 
 (let (x 1 y 2 z (+ x y)) (list x y z))
   => (1 2 3)
+
+(let (x 1) (define y (+ x 1)) y)
+  => 2
 ```
 
-##loop
+## loop
 
 Same as [let](#let), but defines a recursion point, see [recur](#recur).
 
-##recur
+## recur
 
 `(recur args*)`
 
@@ -171,7 +176,7 @@ the number of args (lambda) or bindings (loop). The args/bindings are rebound wi
 `recur` makes it possible to write recursive functions and loops, which get tail-call-optimized
 deterministically.
 
-###Examples
+### Examples
 
 ```clojure
 (define count-down (lambda (n)
@@ -213,7 +218,7 @@ deterministically.
 
 Evaluates all `expr`essions and `last`, returns the value of `last`.
 
-###Examples
+### Examples
 
 ```clojure
 (begin 1 2 3)

@@ -8,6 +8,7 @@ build = "build.rs" # LALRPOP preprocessing
 clap = "2"
 siphasher = "0.1.2"
 rustyline = "1"
+itertools = "0.5.4"
 
 # Add a dependency on the LALRPOP runtime library:
 [dependencies.lalrpop-util]

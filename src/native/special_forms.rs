@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ::value::Value;
 use ::interpreter::Interpreter;
 
@@ -31,22 +32,28 @@ pub fn if_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 }
 
 pub fn lambda(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    check_arity!("lambda", args.len(), 2, 3);
+    check_arity!("lambda", args.len(), min => 2);
 
-    let name;
-    let binding_list;
-    let code;
-    if args.len() == 2 {
-        name = None;
-        binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[0], interpreter);
-        code = args[1].clone();
-    } else {
-        // type check name
-        let name_id = try_unwrap_type!("lambda", "list", Value::get_symbol, &args[0], interpreter);
+    let name: Option<String>;
+    let binding_list: &Value;
+    let code: &[Value];
+
+    if let Some(id) = Value::get_symbol(&args[0]) {
+        // if there is a name the arity must be at least 3
+        check_arity!("lambda", args.len(), min => 3);
+
+        let name_id = id;
         name = interpreter.interner.lookup(name_id).map(Into::into);
-        binding_list = try_unwrap_type!("lambda", "list", Value::get_list, &args[1], interpreter);
-        code = args[2].clone();
+
+        binding_list = &args[1];
+        code = &args[2..];
+    } else {
+        name = None;
+        binding_list = &args[0];
+        code = &args[1..];
     }
+
+    let binding_list = try_unwrap_type!("lambda", "list", Value::get_list, binding_list, interpreter);
 
     let mut bindings: Vec<u64> = Vec::with_capacity(binding_list.len());
     for v in binding_list.iter() {
@@ -54,12 +61,12 @@ pub fn lambda(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         bindings.push(try_unwrap_type!("lambda", "symbol", Value::get_symbol, v, interpreter));
     }
 
-    Value::new_proc(name, interpreter.current_scope.clone(), bindings, code)
+    Value::new_proc(name, interpreter.current_scope.clone(), bindings, code.iter().cloned().collect())
 }
 
 // This behaves like let* in clojure
 pub fn let_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    check_arity!("let*", args.len(), 2);
+    check_arity!("let*", args.len(), min => 2);
     let binding_list = try_unwrap_type!("let*", "list", Value::get_list, &args[0], interpreter);
     assert_or_condition!(binding_list.len() % 2 == 0, "bindings must be a list with an even number of objects");
 
@@ -75,7 +82,10 @@ pub fn let_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     }
 
     // evaluate body with new scope and bindings
-    let res = interpreter.evaluate(&args[1]);
+    let mut res = Value::empty_list();
+    for body in &args[1..] {
+        res = interpreter.evaluate(body);
+    }
 
     // restore old scope
     interpreter.current_scope = parent_scope;
@@ -85,17 +95,23 @@ pub fn let_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
 
 // This behaves like loop in clojure
 pub fn loop_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    check_arity!("loop", args.len(), 2);
+    check_arity!("loop", args.len(), min => 2);
     let binding_list: Vec<Value> = try_unwrap_type!("loop", "list", Value::get_list, &args[0], interpreter);
     assert_or_condition!(binding_list.len() % 2 == 0, "bindings must be a list with an even number of objects");
 
-    let mut binding_names = Vec::with_capacity(binding_list.len() / 2);
-    let mut binding_values = Vec::with_capacity(binding_list.len() / 2);
-    for binding in binding_list.chunks(2) {
-        let binding_name = try_unwrap_type!("loop", "symbol", Value::get_symbol, &binding[0], interpreter);
-        let binding_value = interpreter.evaluate(&binding[1]);
-        binding_names.push(binding_name);
-        binding_values.push(binding_value);
+    // split names and values of bindings, evaluate values of bindings
+    let (binding_names, mut binding_values): (Vec<Value>, Vec<Value>) = binding_list.into_iter()
+    .chunks(2).into_iter()
+    .map(|mut chunk| (chunk.next().unwrap(), chunk.next().unwrap())) // safe because chunk has exactly 2 elements
+    .map(|(name, value)| (name, interpreter.evaluate(&value)))
+    .unzip();
+
+    // map binding names with their ids
+    // this has to be in this for loop for early return
+    let mut binding_ids = Vec::with_capacity(binding_names.len());
+    for name in &binding_names {
+        let id = try_unwrap_type!("loop", "symbol", Value::get_symbol, name, interpreter);
+        binding_ids.push(id);
     }
 
     // replace interpreter scope with fresh child scope
@@ -105,17 +121,27 @@ pub fn loop_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     let mut res;
     loop {
         // bind values in fresh scope
-        for (&binding_name, binding_value) in binding_names.iter().zip(binding_values.iter()) {
-            interpreter.current_scope.add_symbol(binding_name, binding_value.clone());
+        for (&binding_id, binding_value) in binding_ids.iter().zip(binding_values.iter()) {
+            interpreter.current_scope.add_symbol(binding_id, binding_value.clone());
         }
 
-        // evaluate body with new scope and bindings
-        res = interpreter.evaluate(&args[1]);
+        // evaluate each body with new scope and bindings
+        for body in args[1..].iter().take(args.len() - 2) {
+            let res = interpreter.evaluate(body);
+
+            // check for invalid recursion
+            if let Some(_) = res.get_recur() {
+                interpreter.recur_lock = false;
+                raise_condition!("recur in non-tail position")
+            }
+        }
+
+        res = interpreter.evaluate(&args.last().unwrap()); // safe because of arity check
 
         // check for recursion
         if let Some(args) = res.get_recur() {
             interpreter.recur_lock = false;
-            check_arity!("loop", args.len(), binding_values.len() as u32);
+            check_arity!("loop", args.len(), binding_ids.len() as u32);
             binding_values = args.iter().cloned().collect();
             continue;
         }

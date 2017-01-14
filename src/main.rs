@@ -1,5 +1,6 @@
 #![feature(conservative_impl_trait)]
 #[macro_use] extern crate clap;
+#[macro_use] extern crate itertools;
 
 extern crate rustyline;
 extern crate siphasher;
