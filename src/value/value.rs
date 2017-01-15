@@ -7,7 +7,6 @@ use ::value::{Proc};
 use ::interpreter::Interpreter;
 use ::scope::Scope;
 use ::string_interner::StringInterner;
-use ::tail_calls::check_tail_calls;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -32,8 +31,6 @@ impl Value {
         Self::new_with(ValueData::NativeProc(raw))
     }
     pub fn new_proc(name: Option<String>, parent_scope: Scope, bindings: Vec<u64>, code: Vec<Value>) -> Self {
-        assert_or_condition!(check_tail_calls(&*code), "recur in non-tail position");
-
         let procedure = Proc::new(name, parent_scope, bindings, code);
         Self::new_with(ValueData::Proc(procedure))
     }

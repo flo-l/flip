@@ -16,7 +16,6 @@ mod interpreter;
 mod repl;
 mod scope;
 mod string_interner;
-mod tail_calls;
 
 use std::io::Read;
 

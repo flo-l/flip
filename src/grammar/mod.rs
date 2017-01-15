@@ -7,28 +7,13 @@ mod error;
 pub mod error_printing;
 
 use std::mem;
-use lalrpop_util::ParseError;
 use ::value::Value;
 use ::string_interner::StringInterner;
-use tail_calls::check_tail_calls;
 
 pub fn parse<'input>(input: &'input str, interner: &mut StringInterner)
 -> Result<Value, ::lalrpop_util::ParseError<usize, lexer::Token<'input>, error::Error>> {
     let tokenizer = lexer::Tokenizer::new(input);
-    let parsed = parser::parse_TopLevelItem(input, true, interner, tokenizer);
-
-    match parsed {
-        Ok(value) => {
-            let code = &[value];
-            if !check_tail_calls(code) {
-                Err(ParseError::User{error: error::Error::RecurInNonTailPosition})
-            } else {
-                Ok(code[0].clone())
-
-            }
-        }
-        err => err,
-    }
+    parser::parse_TopLevelItem(input, true, interner, tokenizer)
 }
 
 pub fn parse_integer<'input>(input: &'input str)
