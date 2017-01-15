@@ -1,5 +1,6 @@
 use ::value::{Value, ListIter, Proc};
 use ::string_interner::StringInterner;
+use grammar::escape_char;
 use itertools::Itertools;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -21,7 +22,13 @@ impl ValueData {
     pub fn to_string(&self, interner: &StringInterner) -> String {
         match self {
             &ValueData::Bool(x) => format!("{}", x),
-            &ValueData::Char(x) => format!("{}", x),
+            &ValueData::Char(x) => {
+                if let Some(c) = escape_char(x) {
+                    format!("#\\\\{}", c)                    
+                } else {
+                    format!("#\\{}", x)
+                }
+            },
             &ValueData::Integer(x) => format!("{}", x),
             &ValueData::Symbol(id) => format!("{}", interner.lookup(id).unwrap_or(&format!("[SYMBOL: {}]", id.to_string()))),
             &ValueData::String(ref x) => format!("\"{}\"", x),

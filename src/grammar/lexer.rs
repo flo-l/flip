@@ -4,6 +4,9 @@ use std::iter::Peekable;
 
 use super::error::Error;
 
+// use ascii end of transmission as EOF
+const EOF: char = 0x4 as char;
+
 macro_rules! my_try {
     ($e:expr) => ({
         match $e {
@@ -24,6 +27,7 @@ pub enum Token<'input> {
     Integer(i64),
     String(&'input str),
     Symbol(&'input str),
+    Recur,
 }
 
 // Tokenzer state
@@ -82,26 +86,20 @@ impl<'input> Iterator for Tokenizer<'input> {
             match self.peek_next() {
                 Some(&(pos, c)) => next = (self.state, pos, c),
                 // check if we still need something
-                None => {
+                None => next = (self.state, self.text.len(), EOF),
+            }
+/*
+                {
                     let last_token = match self.state {
-                        Minus(start) => Ok((start, Token::Symbol(&self.text[start..]), self.text.len())),
-                        Pound(start) => Ok((start, Token::Symbol(&self.text[start..]), self.text.len())),
-                        EatInteger(start) => Ok((start, Token::Integer(self.text[start..].parse().unwrap()), self.text.len())),
-                        Symbol(start) => Ok((start, Token::Symbol(&self.text[start..]), self.text.len())),
                         EscapedChar(start) => Ok((start, Token::Char('\\'), self.text.len())),
-                        FinishedChar(start, x) => Ok((start, Token::Char(x), self.text.len())),
-                        WhiteSpace(start) => Ok((start, Token::WhiteSpace, self.text.len())),
-                        NewToken => return None,
-                        StringStart(_) => Err(Error::UnexpectedEofString(self.text.len())),
-                        StringBackslash(_) => Err(Error::UnexpectedEofString(self.text.len())),
-                        CharBegin(_) => Err(Error::UnexpectedEofChar(self.text.len())),
-                        Finished(_) => unreachable!(),
+
                     };
                     // fuse iterator
                     self.state = NewToken;
                     return Some(last_token);
                 },
             }
+            */
 
             self.state = match next {
                 // pos + 1 is safe, because all these chars have width 1 byte
@@ -112,6 +110,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                 (NewToken, pos, '-') => Minus(pos),
                 (NewToken, pos, '"') => StringStart(pos),
                 (NewToken, pos, '#') => Pound(pos),
+                (NewToken, _, EOF) => return None,
                 (NewToken, pos, c) if whitespace(c) => WhiteSpace(pos),
                 (NewToken, pos, c) if numeric(c) => EatInteger(pos),
                 (NewToken, pos, _) => Symbol(pos),
@@ -127,13 +126,16 @@ impl<'input> Iterator for Tokenizer<'input> {
 
                 // chars
                 (Pound(pos), _, '\\') => CharBegin(pos),
+                (Pound(start), end, c) if end_of_item(c) => Finished((start, Token::Symbol(&self.text[start..end]), end)),
                 (Pound(pos), _, _) => Symbol(pos),
 
                 (CharBegin(pos), _, '\\') => EscapedChar(pos),
+                (CharBegin(_), _, EOF) => return Some(Err(Error::UnexpectedEofChar(self.text.len()))),
                 (CharBegin(pos), _, c) if printable_char(c) => FinishedChar(pos, c),
                 (CharBegin(_), pos, _) => return Some(Err(Error::NonAsciiChar(pos))),
 
                 (EscapedChar(pos), _, c) if unescape_char(c).is_some() => FinishedChar(pos, unescape_char(c).unwrap()),
+                (EscapedChar(start), end, EOF) => Finished((start, Token::Char('\\'), end)),
                 (EscapedChar(start), end, _) => return Some(Err(Error::InvalidEscape(start+2, next_char(&self.text, end)))), // +2 bc #\ is 2 bytes
 
                 (FinishedChar(start, x), end, c) if end_of_item(c) => Finished((start, Token::Char(x), end)),
@@ -157,14 +159,24 @@ impl<'input> Iterator for Tokenizer<'input> {
                     }
                     Finished((start, Token::String(string), end))
                 },
+                (StringStart(_), _, EOF) => return Some(Err(Error::UnexpectedEofString(self.text.len()))),
                 (StringStart(start), _, '\\') => StringBackslash(start),
                 (StringStart(start), _, _) => StringStart(start),
                 (StringBackslash(start), _, '"') => StringStart(start),
                 (StringBackslash(start), _, c) if unescape_char(c).is_some() => StringStart(start),
+                (StringBackslash(_), _, EOF) => return Some(Err(Error::UnexpectedEofString(self.text.len()))),
                 (StringBackslash(_), pos, _) => return Some(Err(Error::InvalidEscape(pos-1, next_char(&self.text, pos)))), // -1 bc \ is 1 byte
 
                 // symbols
-                (Symbol(start), end, c) if end_of_item(c) => Finished((start, Token::Symbol(&self.text[start..end]), end)),
+                (Symbol(start), end, c) if end_of_item(c) => {
+                    let token = if &self.text[start..end] == "recur" {
+                        Token::Recur
+                    } else {
+                        Token::Symbol(&self.text[start..end])
+                    };
+
+                    Finished((start, token, end))
+                },
                 (Symbol(start), _, _) => Symbol(start),
                 (Finished(_), _, _) => unreachable!(),
             };
@@ -174,6 +186,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                     self.state = NewToken;
                     return Some(Ok(token))
                 },
+                _ if next.2 == EOF => self.state = NewToken, // fuse iterator
                 _  => { self.next_char(); }, // bump
             }
         }
@@ -188,7 +201,18 @@ fn whitespace(x: char) -> bool {
 
 fn end_of_item(x: char) -> bool {
     whitespace(x) ||
-    x == ')'
+    x == ')' ||
+    x == EOF
+}
+
+pub fn escape_char(x: char) -> Option<char> {
+    match x {
+        '\n' => Some('n'),
+        ' ' => Some('s'),
+        '\t' => Some('t'),
+        '\\' => Some('\\'),
+        _ => None,
+    }
 }
 
 fn unescape_char(x: char) -> Option<char> {

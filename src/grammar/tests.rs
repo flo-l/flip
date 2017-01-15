@@ -2,7 +2,8 @@ use std::usize;
 use lalrpop_util::ParseError;
 use ::value::Value;
 use super::parse;
-use super::lexer::{Token, Error};
+use super::lexer::Token;
+use super::error::Error;
 use ::string_interner::StringInterner;
 
 const EOF: usize = usize::MAX;
@@ -146,7 +147,6 @@ fn string() {
     macro_rules! expect_str_ok {
         ($s:expr, $e:expr) => ({
             let s = q($s);
-            println!("testing: {}", s);
             let interner = &mut StringInterner::new();
             expect_ok!(parse, interner, s, Value::new_string($e));
         });
@@ -212,8 +212,15 @@ fn quote() {
 }
 
 #[test]
+fn recur() {
+    let interner = &mut StringInterner::new();
+
+    expect_ok!(parse, interner, "recur", Value::new_symbol(interner.intern("recur")));
+}
+
+#[test]
 fn everything_together() {
     let interner = &mut StringInterner::new();
     let string = r#"("hi" my "NaMe" #\i #\s false -42 # #\\n)"#;
-    assert_eq!(parse(string, interner).unwrap().to_string(interner), r#"("hi" my "NaMe" i s false -42 # #\\n)"#)
+    assert_eq!(parse(string, interner).unwrap().to_string(interner), r#"("hi" my "NaMe" #\i #\s false -42 # #\\n)"#)
 }

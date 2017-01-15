@@ -10,6 +10,8 @@ use std::mem;
 use ::value::Value;
 use ::string_interner::StringInterner;
 
+pub use self::lexer::escape_char;
+
 pub fn parse<'input>(input: &'input str, interner: &mut StringInterner)
 -> Result<Value, ::lalrpop_util::ParseError<usize, lexer::Token<'input>, error::Error>> {
     let tokenizer = lexer::Tokenizer::new(input);
