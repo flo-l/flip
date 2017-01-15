@@ -17,6 +17,7 @@ extern {
         Dot => Token::Dot,
         Quote => Token::Quote,
         WhiteSpace => Token::WhiteSpace,
+        Recur => Token::Recur,
         Chr => Token::Char(<char>),
         Int => Token::Integer(<i64>),
         Str => Token::String(<&'input str>),
@@ -43,6 +44,7 @@ Symbol: Value = {
            },
        }
    },
+   Recur => Value::new_symbol(interner.intern("recur")),
 };
 
 String: Value = {

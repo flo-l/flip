@@ -216,11 +216,12 @@ fn recur() {
     let interner = &mut StringInterner::new();
 
     expect_ok!(parse, interner, "recur", Value::new_symbol(interner.intern("recur")));
+    expect_error!(parse, "(let () (recur) bla)");
 }
 
 #[test]
 fn everything_together() {
     let interner = &mut StringInterner::new();
-    let string = r#"("hi" my "NaMe" #\i #\s false -42 # #\\n)"#;
-    assert_eq!(parse(string, interner).unwrap().to_string(interner), r#"("hi" my "NaMe" #\i #\s false -42 # #\\n)"#)
+    let string = r#"("hi" my "NaMe" #\i #\s recur -42 # #\\n)"#;
+    assert_eq!(parse(string, interner).unwrap().to_string(interner), r#"("hi" my "NaMe" #\i #\s recur -42 # #\\n)"#)
 }
