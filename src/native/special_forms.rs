@@ -99,32 +99,40 @@ pub fn loop_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     let binding_list: Vec<Value> = try_unwrap_type!("loop", "list", Value::get_list, &args[0], interpreter);
     assert_or_condition!(binding_list.len() % 2 == 0, "bindings must be a list with an even number of objects");
 
-    // split names and values of bindings, evaluate values of bindings
-    let (binding_names, mut binding_values): (Vec<Value>, Vec<Value>) = binding_list.into_iter()
-    .chunks(2).into_iter()
-    .map(|mut chunk| (chunk.next().unwrap(), chunk.next().unwrap())) // safe because chunk has exactly 2 elements
-    .map(|(name, value)| (name, interpreter.evaluate(&value)))
-    .unzip();
 
-    // map binding names with their ids
-    // this has to be in this for loop for early return
-    let mut binding_ids = Vec::with_capacity(binding_names.len());
-    for name in &binding_names {
-        let id = try_unwrap_type!("loop", "symbol", Value::get_symbol, name, interpreter);
-        binding_ids.push(id);
-    }
+    // type check binding names and creates a vec with their ids
+    let binding_ids = binding_list.iter()
+    .step(2)
+    .map(|name| {
+        if let Some(id) = Value::get_symbol(name) {
+            Ok(id)
+        } else {
+            Err(new_condition!(format!("loop expected symbol, got: {}", name.to_string(&interpreter.interner))))
+        }
+    })
+    .collect::<Result<Vec<u64>, Value>>();
+
+    // if any name was not a symbol, return the condition raised
+    let binding_ids = match binding_ids {
+        Ok(ids) => ids,
+        Err(condition) => return condition,
+    };
+
+    // values are elements 1, 3, 5, etc.
+    let binding_values = binding_list.iter().skip(1).step(2);
 
     // replace interpreter scope with fresh child scope
     let parent_scope = interpreter.current_scope.clone();
     interpreter.current_scope = parent_scope.new_child();
 
+    // bind values in fresh scope
+    for (&binding_id, binding_value) in binding_ids.iter().zip(binding_values) {
+        let evaluated_value = interpreter.evaluate(binding_value);
+        interpreter.current_scope.add_symbol(binding_id, evaluated_value);
+    }
+
     let mut res;
     loop {
-        // bind values in fresh scope
-        for (&binding_id, binding_value) in binding_ids.iter().zip(binding_values.iter()) {
-            interpreter.current_scope.add_symbol(binding_id, binding_value.clone());
-        }
-
         // evaluate each body with new scope and bindings
         for body in args[1..].iter().take(args.len() - 2) {
             let res = interpreter.evaluate(body);
@@ -142,7 +150,12 @@ pub fn loop_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
         if let Some(args) = res.get_recur() {
             interpreter.recur_lock = false;
             check_arity!("loop", args.len(), binding_ids.len() as u32);
-            binding_values = args.iter().cloned().collect();
+
+            // bind new values from recur
+            for (&binding_id, binding_value) in binding_ids.iter().zip(args.iter()) {
+                interpreter.current_scope.add_symbol(binding_id, binding_value.clone());
+            }
+
             continue;
         }
 
