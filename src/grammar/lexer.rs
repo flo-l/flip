@@ -27,6 +27,12 @@ pub enum Token<'input> {
     Integer(i64),
     String(&'input str),
     Symbol(&'input str),
+    Begin,
+    Define,
+    If,
+    Let,
+    Loop,
+    Lambda,
     Recur,
 }
 
@@ -169,10 +175,15 @@ impl<'input> Iterator for Tokenizer<'input> {
 
                 // symbols
                 (Symbol(start), end, c) if end_of_item(c) => {
-                    let token = if &self.text[start..end] == "recur" {
-                        Token::Recur
-                    } else {
-                        Token::Symbol(&self.text[start..end])
+                    let token = match &self.text[start..end] {
+                        "begin" => Token::Begin,
+                        "define" => Token::Define,
+                        "if" => Token::If,
+                        "let" => Token::Let,
+                        "loop" => Token::Loop,
+                        "lambda" => Token::Lambda,
+                        "recur" => Token::Recur,
+                        x => Token::Symbol(x),
                     };
 
                     Finished((start, token, end))
