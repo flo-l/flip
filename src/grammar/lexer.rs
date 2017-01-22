@@ -94,18 +94,6 @@ impl<'input> Iterator for Tokenizer<'input> {
                 // check if we still need something
                 None => next = (self.state, self.text.len(), EOF),
             }
-/*
-                {
-                    let last_token = match self.state {
-                        EscapedChar(start) => Ok((start, Token::Char('\\'), self.text.len())),
-
-                    };
-                    // fuse iterator
-                    self.state = NewToken;
-                    return Some(last_token);
-                },
-            }
-            */
 
             self.state = match next {
                 // pos + 1 is safe, because all these chars have width 1 byte
@@ -163,7 +151,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                             return Some(Err(Error::NonAsciiChar(i+1))) // +1 bc start+1 above
                         }
                     }
-                    Finished((start, Token::String(string), end))
+                    Finished((start, Token::String(string), end+1))
                 },
                 (StringStart(_), _, EOF) => return Some(Err(Error::UnexpectedEofString(self.text.len()))),
                 (StringStart(start), _, '\\') => StringBackslash(start),
