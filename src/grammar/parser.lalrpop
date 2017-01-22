@@ -17,6 +17,12 @@ extern {
         Dot => Token::Dot,
         Quote => Token::Quote,
         WhiteSpace => Token::WhiteSpace,
+        Begin => Token::Begin,
+        Define => Token::Define,
+        If => Token::If,
+        Let => Token::Let,
+        Loop => Token::Loop,
+        Lambda => Token::Lambda,
         Recur => Token::Recur,
         Chr => Token::Char(<char>),
         Int => Token::Integer(<i64>),
@@ -33,7 +39,8 @@ pub Integer: Value = {
     <i:Int> => Value::new_integer(i),
 };
 
-Symbol: Value = {
+// symbol which is not the name of a special form
+NonSpecialSymbol: Value = {
    <s:Sym> => {
        match s {
            "true" => Value::new_bool(true),
@@ -44,7 +51,19 @@ Symbol: Value = {
            },
        }
    },
-   Recur => Value::new_symbol(interner.intern("recur")),
+};
+
+// symbol which is the name of a special form
+#[inline]
+SpecialSymbol: Value = {
+    If => Value::new_symbol(interner.intern("if")),
+    Recur => Value::new_symbol(interner.intern("recur")),
+};
+
+// all valid symbols
+Symbol: Value = {
+    NonSpecialSymbol,
+    SpecialSymbol,
 };
 
 String: Value = {
@@ -62,23 +81,138 @@ Pair: Value = {
 
 List: Value = {
     EmptyList,
-    OpenParen WhiteSpace? <v:(Item WhiteSpace)*> <last:Item> WhiteSpace? ClosingParen => {
-        let values: Vec<Value> = v.into_iter().map(|(v, _)| v).chain(iter::once(last)).collect();
+
+    // one element
+    OpenParen WhiteSpace? <elem: NonSpecialItem> WhiteSpace? ClosingParen => {
+        Value::new_list(&[elem])
+    },
+
+    // 2+ elements
+    OpenParen WhiteSpace? <first: NonSpecialItem> WhiteSpace <v:(Item WhiteSpace)*> <last:Item> WhiteSpace? ClosingParen => {
+        let first = iter::once(first);
+        let middle = v.into_iter().map(|(v, _)| v);
+        let last = iter::once(last);
+        let values: Vec<Value> = first.chain(middle).chain(last).collect();
         Value::new_list(&values)
     },
 };
 
-Item: Value = {
+#[inline]
+Code: Vec<Value> = {
+    <code:(WhiteSpace Item)+> => {
+        code.into_iter().map(|(_, v)| v).collect()
+    }
+};
+
+SpecialFormBegin: Value = {
+    OpenParen WhiteSpace? Begin <code:Code> WhiteSpace? ClosingParen => {
+        let begin = iter::once(Value::new_symbol(interner.intern("begin")));
+        let values: Vec<Value> = begin.chain(code.into_iter()).collect();
+        Value::new_list(&values)
+    },
+};
+
+SpecialFormDefine: Value = {
+    OpenParen WhiteSpace? Define WhiteSpace <name:Symbol> WhiteSpace <expr:Item> WhiteSpace? ClosingParen => {
+        let define = Value::new_symbol(interner.intern("define"));
+        Value::new_list(&[define, name, expr])
+    },
+};
+
+SpecialFormIf: Value = {
+    OpenParen WhiteSpace? If WhiteSpace <cond:Item> WhiteSpace <then:Item> WhiteSpace <els:Item> WhiteSpace? ClosingParen => {
+        Value::new_list(&[Value::new_symbol(interner.intern("if")), cond, then, els])
+    },
+};
+
+BindingList: Vec<Value> = {
+    OpenParen WhiteSpace? ClosingParen => {
+        vec![]
+    },
+
+    OpenParen WhiteSpace? <name:Symbol> WhiteSpace <expr:Item> <rest:(WhiteSpace Symbol WhiteSpace Item)*> WhiteSpace? ClosingParen => {
+        // make it linear again for now
+        let name = iter::once(name);
+        let expr = iter::once(expr);
+        let rest = rest.into_iter().flat_map(|(_, name, _, expr)| iter::once(name).chain(iter::once(expr)));
+        name.chain(expr).chain(rest).collect()
+    },
+};
+
+SpecialFormLet: Value = {
+    OpenParen WhiteSpace? Let WhiteSpace <bindings:BindingList> <code:Code> WhiteSpace? ClosingParen => {
+        let begin = iter::once(Value::new_symbol(interner.intern("let")));
+        let bindings = iter::once(Value::new_list(&bindings));
+        let values: Vec<Value> = begin.chain(bindings).chain(code.into_iter()).collect();
+        Value::new_list(&values)
+    },
+};
+
+SpecialFormLoop: Value = {
+    OpenParen WhiteSpace? Loop WhiteSpace <bindings:BindingList> <code:Code> WhiteSpace? ClosingParen => {
+        let begin = iter::once(Value::new_symbol(interner.intern("loop")));
+        let bindings = iter::once(Value::new_list(&bindings));
+        let values: Vec<Value> = begin.chain(bindings).chain(code.into_iter()).collect();
+        Value::new_list(&values)
+    },
+};
+
+LambdaArgs: Vec<Value> = {
+    OpenParen WhiteSpace? ClosingParen => {
+        vec![]
+    },
+
+    OpenParen WhiteSpace? <first:Symbol> <args:(WhiteSpace Symbol)*> WhiteSpace? ClosingParen => {
+        let first = iter::once(first);
+        let rest = args.into_iter().map(|(_, v)| v);
+        first.chain(rest).collect()
+    }
+};
+
+SpecialFormLambda: Value = {
+    OpenParen WhiteSpace? Lambda WhiteSpace <name:(Symbol WhiteSpace)?> <args:LambdaArgs> <code:Code> WhiteSpace? ClosingParen => {
+        let begin = iter::once(Value::new_symbol(interner.intern("lambda")));
+        let name = name.map(|(name, _)| name);
+        let args = iter::once(Value::new_list(&args));
+        let values: Vec<Value> = begin.chain(name).chain(args).chain(code.into_iter()).collect();
+        Value::new_list(&values)
+    },
+};
+
+SpecialFormRecur: Value = {
+    OpenParen WhiteSpace? Recur <args:Code?> WhiteSpace? ClosingParen => {
+        let begin = iter::once(Value::new_symbol(interner.intern("recur")));
+        let args = args.into_iter().flat_map(|x| x.into_iter());
+        let values: Vec<Value> = begin.chain(args).collect();
+        Value::new_list(&values)
+    },
+};
+
+// everything except for names of special forms
+NonSpecialItem: Value = {
     Quote <Item> => {
         assert!(interner_valid, "internal error: interner not set");
         Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
     },
     Char,
     Integer,
-    Symbol,
+    NonSpecialSymbol,
     String,
     Pair,
     List,
+    SpecialFormBegin,
+    SpecialFormDefine,
+    SpecialFormIf,
+    SpecialFormLet,
+    SpecialFormLoop,
+    SpecialFormLambda,
+    SpecialFormRecur,
+};
+
+#[inline]
+Item: Value = {
+    NonSpecialItem,
+    SpecialSymbol,
 };
 
 pub TopLevelItem: Value = {
