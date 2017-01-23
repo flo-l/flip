@@ -80,6 +80,8 @@ EmptyList: Value = {
 };
 
 Pair: Value = {
+    // the first item may not be a special symbol because lalrpop doesn't like it
+    // this is not too bad, as allowing this could result in invalid special forms being created
     OpenParen WhiteSpace? <a:NonSpecialItem> WhiteSpace Dot WhiteSpace <b:Item> WhiteSpace? ClosingParen
     => Value::new_pair(a, b),
 };
@@ -255,6 +257,10 @@ SpecialFormRecur: Value = {
 // everything except for names of special forms and tail calls
 NonSpecialItem: Value = {
     Quote <Item> => {
+        assert!(interner_valid, "internal error: interner not set");
+        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
+    },
+    Quote <TailCall> => {
         assert!(interner_valid, "internal error: interner not set");
         Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
     },
