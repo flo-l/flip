@@ -3,6 +3,7 @@ use std::iter;
 use std::collections::btree_set::BTreeSet;
 use ::interpreter;
 use ::grammar::{self, error_printing};
+use ::value::Value;
 
 pub struct Repl {}
 
@@ -36,7 +37,13 @@ impl Repl {
             // strip \n at the end
             let parsed = grammar::parse(&line, &mut interpreter.interner);
             match parsed {
-                Ok(value) => println!("=> {}", interpreter.evaluate(&value).to_string(&interpreter.interner)),
+                Ok(values) => {
+                    let mut result = Value::empty_list();
+                    for x in &values {
+                        result = interpreter.evaluate(x);
+                    }
+                    println!("=> {}", result.to_string(&interpreter.interner))
+                },
                 Err(ref err)  => println!("{}", error_printing::create_error_message(&line, err)),
             }
         }

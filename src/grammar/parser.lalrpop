@@ -284,6 +284,10 @@ TailCall: Value = {
     SpecialFormLetTailCall,
 };
 
-pub TopLevelItem: Value = {
-    WhiteSpace? <Item> WhiteSpace?
+pub TopLevelItem: Vec<Value> = {
+    WhiteSpace? <first:Item> <rest:Code?> WhiteSpace? => {
+        let first = iter::once(first);
+        let rest = rest.into_iter().flat_map(|x| x.into_iter());
+        first.chain(rest).collect()
+    }
 };
