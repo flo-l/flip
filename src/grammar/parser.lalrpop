@@ -139,6 +139,20 @@ SpecialFormIf: Value = {
     },
 };
 
+SpecialFormIfTailCall: Value = {
+    OpenParen WhiteSpace? If WhiteSpace <cond:Item> WhiteSpace <then:TailCall> WhiteSpace <els:Item> WhiteSpace? ClosingParen => {
+        Value::new_list(&[Value::new_symbol(interner.intern("if")), cond, then, els])
+    },
+
+    OpenParen WhiteSpace? If WhiteSpace <cond:Item> WhiteSpace <then:Item> WhiteSpace <els:TailCall> WhiteSpace? ClosingParen => {
+        Value::new_list(&[Value::new_symbol(interner.intern("if")), cond, then, els])
+    },
+
+    OpenParen WhiteSpace? If WhiteSpace <cond:Item> WhiteSpace <then:TailCall> WhiteSpace <els:TailCall> WhiteSpace? ClosingParen => {
+        Value::new_list(&[Value::new_symbol(interner.intern("if")), cond, then, els])
+    },
+};
+
 BindingList: Vec<Value> = {
     OpenParen WhiteSpace? ClosingParen => {
         vec![]
@@ -162,6 +176,17 @@ SpecialFormLet: Value = {
     },
 };
 
+SpecialFormLetTailCall: Value = {
+    OpenParen WhiteSpace? Let WhiteSpace <bindings:BindingList> <code:Code?> WhiteSpace <last:TailCall> WhiteSpace? ClosingParen => {
+        let begin = iter::once(Value::new_symbol(interner.intern("let")));
+        let bindings = iter::once(Value::new_list(&bindings));
+        let code = code.into_iter().flat_map(|x| x.into_iter());
+        let last = iter::once(last);
+        let values: Vec<Value> = begin.chain(bindings).chain(code).chain(last).collect();
+        Value::new_list(&values)
+    },
+};
+
 SpecialFormLoop: Value = {
     // without tail call
     OpenParen WhiteSpace? Loop WhiteSpace <bindings:BindingList> <code:Code> WhiteSpace? ClosingParen => {
@@ -173,7 +198,7 @@ SpecialFormLoop: Value = {
     },
 
     // with tail call
-    OpenParen WhiteSpace? Loop WhiteSpace <bindings:BindingList> <code:Code?> <last:TailCall> WhiteSpace? ClosingParen => {
+    OpenParen WhiteSpace? Loop WhiteSpace <bindings:BindingList> <code:Code?> WhiteSpace <last:TailCall> WhiteSpace? ClosingParen => {
         let begin = iter::once(Value::new_symbol(interner.intern("loop")));
         let bindings = iter::once(Value::new_list(&bindings));
         let code = code.into_iter().flat_map(|x| x.into_iter());
@@ -255,6 +280,8 @@ Item: Value = {
 TailCall: Value = {
     SpecialFormRecur,
     SpecialFormBeginTailCall,
+    SpecialFormIfTailCall,
+    SpecialFormLetTailCall,
 };
 
 pub TopLevelItem: Value = {
