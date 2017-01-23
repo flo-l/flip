@@ -5,6 +5,7 @@ use ::grammar::lexer::unescape_string;
 use super::lexer::Token;
 use super::error::Error;
 
+#[LALR]
 grammar<'input>(text: &'input str, interner_valid: bool, interner: &mut StringInterner);
 
 extern {
@@ -271,7 +272,6 @@ NonSpecialItem: Value = {
     SpecialFormLambda,
 };
 
-#[inline]
 Item: Value = {
     NonSpecialItem,
     SpecialSymbol,
