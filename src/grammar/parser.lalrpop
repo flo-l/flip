@@ -116,15 +116,15 @@ SpecialFormBegin: Value = {
     },
 };
 
-//SpecialFormBeginTailCall: Value = {
-//    OpenParen WhiteSpace? Begin <code:Code?> WhiteSpace <last:TailCall> WhiteSpace? ClosingParen => {
-//        let begin = iter::once(Value::new_symbol(interner.intern("begin")));
-//        let code = code.into_iter().flat_map(|x| x.into_iter());
-//        let last = iter::once(last);
-//        let values: Vec<Value> = begin.chain(code).chain(last).collect();
-//        Value::new_list(&values)
-//    },
-//};
+SpecialFormBeginTailCall: Value = {
+    OpenParen WhiteSpace? Begin <code:Code?> WhiteSpace <last:TailCall> WhiteSpace? ClosingParen => {
+        let begin = iter::once(Value::new_symbol(interner.intern("begin")));
+        let code = code.into_iter().flat_map(|x| x.into_iter());
+        let last = iter::once(last);
+        let values: Vec<Value> = begin.chain(code).chain(last).collect();
+        Value::new_list(&values)
+    },
+};
 
 SpecialFormDefine: Value = {
     OpenParen WhiteSpace? Define WhiteSpace <name:Symbol> WhiteSpace <expr:Item> WhiteSpace? ClosingParen => {
@@ -163,10 +163,22 @@ SpecialFormLet: Value = {
 };
 
 SpecialFormLoop: Value = {
+    // without tail call
     OpenParen WhiteSpace? Loop WhiteSpace <bindings:BindingList> <code:Code> WhiteSpace? ClosingParen => {
         let begin = iter::once(Value::new_symbol(interner.intern("loop")));
         let bindings = iter::once(Value::new_list(&bindings));
-        let values: Vec<Value> = begin.chain(bindings).chain(code.into_iter()).collect();
+        let code = code.into_iter();
+        let values: Vec<Value> = begin.chain(bindings).chain(code).collect();
+        Value::new_list(&values)
+    },
+
+    // with tail call
+    OpenParen WhiteSpace? Loop WhiteSpace <bindings:BindingList> <code:Code?> <last:(WhiteSpace TailCall)> WhiteSpace? ClosingParen => {
+        let begin = iter::once(Value::new_symbol(interner.intern("loop")));
+        let bindings = iter::once(Value::new_list(&bindings));
+        let code = code.into_iter().flat_map(|x| x.into_iter());
+        let last = iter::once(last.1);
+        let values: Vec<Value> = begin.chain(bindings).chain(code).chain(last).collect();
         Value::new_list(&values)
     },
 };
@@ -228,20 +240,10 @@ Item: Value = {
     SpecialSymbol,
 };
 
-// some form that may include a valid recur form
-// eg. (recur x)
-// eg. (if true 0 (recur 1))
-// etc.
-//#[inline]
-//MaybeTailCall: Value = {
-//    Item,
-//    //TailCall,
-//};
-
-//TailCall: Value = {
-//    SpecialFormRecur,
-    //SpecialFormBeginTailCall,
-//};
+TailCall: Value = {
+    SpecialFormRecur,
+    SpecialFormBeginTailCall,
+};
 
 pub TopLevelItem: Value = {
     WhiteSpace? <Item> WhiteSpace?
