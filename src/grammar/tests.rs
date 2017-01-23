@@ -43,7 +43,7 @@ macro_rules! expect_error {
                     panic!("for input: {:?}, got Err({:?}) at pos {}, expected pos: {}", input, err, $token_fn(err), $position);
                 }
             },
-            Ok(v) => panic!("expected error for string: '{}', got: {}", input, v.to_string(interner)),
+            Ok(v) => panic!("expected error for string: '{}', got: {}", input, v[0].to_string(interner)),
         }
     );
 }
@@ -56,6 +56,8 @@ macro_rules! expect_ok {
         let result = $parser(input, $interner);
         match result {
             Ok(v) => {
+                assert!(v.len() == 1);
+                let v = &v[0];
                 let res = v.to_string($interner);
                 if res != expected {
                     panic!("parser ok, but input: {:?} got: Ok({:?}), expected: {}", input, res, expected);
@@ -216,12 +218,63 @@ fn recur() {
     let interner = &mut StringInterner::new();
 
     expect_ok!(parse, interner, "recur", Value::new_symbol(interner.intern("recur")));
-    expect_error!(parse, "(let () (recur) bla)");
+    expect_ok!(parse, interner, "'(recur)", Value::new_list(&[Value::new_symbol(interner.intern("quote")), Value::new_list(&[Value::new_symbol(interner.intern("recur"))])]));
+    expect_ok!(parse, interner, "'recur", Value::new_list(&[Value::new_symbol(interner.intern("quote")), Value::new_symbol(interner.intern("recur"))]));
 }
+
+#[test]
+fn tail_calls() {
+    let interner = &mut StringInterner::new();
+
+    // top level
+    expect_error!(parse, "(recur)");
+
+    // begin
+    expect_error!(parse, "(begin (recur))");
+    expect_error!(parse, "(begin bla (recur))");
+
+    // define covered later
+
+    // if
+    expect_error!(parse, "(if true (recur) bla)");
+    expect_error!(parse, "(if true bla (recur))");
+    expect_error!(parse, "(if true (recur) (recur))");
+
+    // let
+    expect_error!(parse, "(let () (recur))");
+    expect_error!(parse, "(let () bla (recur))");
+
+    // loop
+    expect_ok!(parse, interner, "(loop () (recur))", Value::new_list(&[Value::new_symbol(interner.intern("loop")), Value::empty_list(), Value::new_list(&[Value::new_symbol(interner.intern("recur"))])]));
+    expect_ok!(parse, interner, "(loop () bla (recur))", Value::new_list(&[Value::new_symbol(interner.intern("loop")), Value::empty_list(), Value::new_symbol(interner.intern("bla")), Value::new_list(&[Value::new_symbol(interner.intern("recur"))])]));
+    expect_error!(parse, "(loop () (recur) bla)");
+
+    // lambda
+    expect_ok!(parse, interner, "(lambda () (recur))", Value::new_list(&[Value::new_symbol(interner.intern("lambda")), Value::empty_list(), Value::new_list(&[Value::new_symbol(interner.intern("recur"))])]));
+    expect_ok!(parse, interner, "(lambda () bla (recur))", Value::new_list(&[Value::new_symbol(interner.intern("lambda")), Value::empty_list(), Value::new_symbol(interner.intern("bla")), Value::new_list(&[Value::new_symbol(interner.intern("recur"))])]));
+    expect_error!(parse, "(lambda () (recur) bla)");
+
+    // invalid tail calls
+    let begin = "(begin (recur) bla)";
+    let define = "(define a (recur))";
+    let let_ = "(let () (recur) bla)";
+
+    let no_tail_calls = &[begin, define, let_];
+
+    for x in no_tail_calls {
+        // insert x so that a tail call would be correct
+        let code = format!("(loop () {})", x);
+        expect_error!(parse, code);
+    }
+}
+
+// TODO add tests for special forms
 
 #[test]
 fn everything_together() {
     let interner = &mut StringInterner::new();
     let string = r#"("hi" my "NaMe" #\i #\s recur -42 # #\\n)"#;
-    assert_eq!(parse(string, interner).unwrap().to_string(interner), r#"("hi" my "NaMe" #\i #\s recur -42 # #\\n)"#)
+    let parsed = parse(string, interner).unwrap();
+    assert!(parsed.len() == 1);
+    assert_eq!(parsed[0].to_string(interner), r#"("hi" my "NaMe" #\i #\s recur -42 # #\\n)"#);
 }
