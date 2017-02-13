@@ -37,7 +37,6 @@ impl Interpreter {
         self.add_str_to_current_scope("integer?", Value::new_native_proc(native::integer_));
         self.add_str_to_current_scope("char?", Value::new_native_proc(native::char_));
         self.add_str_to_current_scope("string?", Value::new_native_proc(native::string_));
-        self.add_str_to_current_scope("pair?", Value::new_native_proc(native::pair_));
         self.add_str_to_current_scope("procedure?", Value::new_native_proc(native::procedure_));
 
         self.add_str_to_current_scope("char->integer", Value::new_native_proc(native::char_integer));

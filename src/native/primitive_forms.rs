@@ -25,7 +25,6 @@ type_checker!(symbol_, "symbol?", get_symbol);
 type_checker!(integer_, "integer?", get_integer);
 type_checker!(char_, "char?", get_char);
 type_checker!(string_, "string?", get_string);
-type_checker!(pair_, "pair?", get_pair);
 
 eval_args!(fn procedure_(args: &mut [Value]) -> Value {
     check_arity!("procedure?", args.len(), 1);
@@ -163,21 +162,27 @@ comparison_operator!(ge, ">=", PartialOrd::ge);
 eval_args!(fn car(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("car", args.len(), 1);
 
+    unimplemented!();
+    /* TODO maybe rename to first or head?
     if let Some((a, _)) = args[0].get_pair() {
         a.clone()
     } else {
         raise_condition!(format!("expected pair, got {}", &args[0].to_string(&interpreter.interner)));
     }
+    */
 });
 
 eval_args!(fn cdr(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("cdr", args.len(), 1);
 
+    unimplemented!();
+    /* TODO maybe rename to rest?
     if let Some((_, b)) = args[0].get_pair() {
         b.clone()
     } else {
         raise_condition!(format!("expected pair, got {}", &args[0].to_string(&interpreter.interner)));
     }
+    */
 });
 
 eval_args!(fn list(args: &mut [Value]) -> Value {

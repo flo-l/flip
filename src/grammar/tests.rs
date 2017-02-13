@@ -171,27 +171,10 @@ fn string() {
 }
 
 #[test]
-fn pair() {
-    let interner = &mut StringInterner::new();
-    let t = Value::new_bool(true);
-    let f = Value::new_bool(false);
-    let e = Value::empty_list();
-
-    expect_ok!(parse, interner, "(true . false)", Value::new_pair(t.clone(), f.clone()));
-    expect_ok!(parse, interner, "(true . (false . ()))", Value::new_pair(t, Value::new_pair(f.clone(), e.clone())));
-
-    expect_error!(parse, "(1 .)", 4);
-    expect_error!(parse, "(. 2)", 1);
-    expect_error!(parse, "(1 . 2 3)", 7);
-    expect_error!(parse, "(1 . 2 . 3)", 7);
-    expect_error!(parse, "(1 2 . 3)", 5);
-}
-
-#[test]
 fn list() {
     let interner = &mut StringInterner::new();
     expect_ok!(parse, interner, "()", Value::empty_list());
-    expect_ok!(parse, interner, r#"(1 "2" (3 . 4))"#, Value::new_list(&vec![Value::new_integer(1), Value::new_string("2"), Value::new_pair(Value::new_integer(3), Value::new_integer(4))]));
+    expect_ok!(parse, interner, r#"(1 "2" 3 4)"#, Value::new_list(&vec![Value::new_integer(1), Value::new_string("2"), Value::new_integer(3), Value::new_integer(4)]));
     expect_ok!(parse, interner, "(() ())", Value::new_list(&vec![Value::empty_list(), Value::empty_list()]));
 
     expect_error!(parse, "(( ())");

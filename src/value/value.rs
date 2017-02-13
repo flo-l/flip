@@ -23,7 +23,6 @@ impl Value {
     pub fn new_integer(x: i64) -> Self { Self::new_with(ValueData::Integer(x)) }
     pub fn new_symbol(id: u64) -> Self { Self::new_with(ValueData::Symbol(id)) }
     pub fn new_string<'a, T: 'a + Into<Cow<'a, str>>>(x: T) -> Self { Self::new_with(ValueData::String(x.into().into_owned())) }
-    pub fn new_pair(a: Value, b: Value) -> Self { Self::new_with(ValueData::Pair(a,b)) }
     pub fn new_condition(x: Value) -> Self { Self::new_with(ValueData::Condition(x)) }
     pub fn empty_list() -> Self { Self::new_with(ValueData::EmptyList) }
     pub fn new_native_proc(f: fn(&mut Interpreter, &mut [Value]) -> Value) -> Self {
@@ -47,8 +46,8 @@ impl Value {
 
     pub fn get_list(&self) -> Option<Vec<Value>> {
         match self.data() {
-            &ValueData::Pair(_, ref b) if b.get_pair().is_some() || b.get_empty_list().is_some() => {
-                Some(ListIter::new(self).cloned().collect())
+            &ValueData::List => {
+                unimplemented!(); // TODO
             },
             &ValueData::EmptyList => Some(vec![]),
             _ => None
@@ -90,13 +89,6 @@ impl Value {
         }
     }
 
-    pub fn get_pair(&self) -> Option<(&Value, &Value)> {
-        match self.data() {
-            &ValueData::Pair(ref a, ref b) => Some((a, b)),
-            _ => None,
-        }
-    }
-
     pub fn get_condition(&self) -> Option<&Value> {
         match self.data() {
             &ValueData::Condition(ref x) => Some(x),
@@ -126,9 +118,13 @@ impl Value {
     }
     pub fn new_list(elements: &[Value]) -> Value {
         if elements.len() == 0 { return Value::empty_list(); }
+        unimplemented!();
+        // TODO
+/*
         let mut iter = elements.into_iter().rev();
         let last = iter.next().unwrap(); // safe because list len must be >= 1
         iter.fold(Value::new_pair(last.clone(), Value::empty_list()), |prev_pair, value| Value::new_pair(value.clone(), prev_pair))
+*/
     }
 
     pub fn to_string(&self, interner: &StringInterner) -> String {
@@ -149,15 +145,7 @@ impl<'a> Iterator for ListIter<'a> {
     type Item = &'a Value;
     fn next(&mut self) -> Option<Self::Item> {
         match self.current.data() {
-            &ValueData::Pair(ref a, ref b) if b.get_pair().is_some() || b.get_empty_list().is_some() => {
-                self.current = b;
-                Some(a)
-            },
-            &ValueData::Pair(ref a, _) => {
-                let ret = self.current;
-                self.current = a; // dummy
-                Some(ret)
-            }
+            // TODO
             _ => None,
         }
     }

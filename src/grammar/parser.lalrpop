@@ -79,13 +79,6 @@ EmptyList: Value = {
     OpenParen WhiteSpace? ClosingParen => Value::empty_list(),
 };
 
-Pair: Value = {
-    // the first item may not be a special symbol because lalrpop doesn't like it
-    // this is not too bad, as allowing this could result in invalid special forms being created
-    OpenParen WhiteSpace? <a:NonSpecialItem> WhiteSpace Dot WhiteSpace <b:Item> WhiteSpace? ClosingParen
-    => Value::new_pair(a, b),
-};
-
 List: Value = {
     EmptyList,
 
@@ -268,7 +261,6 @@ NonSpecialItem: Value = {
     Integer,
     NonSpecialSymbol,
     String,
-    Pair,
     List,
     SpecialFormBegin,
     SpecialFormDefine,
