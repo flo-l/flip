@@ -15,7 +15,7 @@ extern {
     enum Token<'input> {
         OpenParen => Token::OpenParen,
         ClosingParen => Token::ClosingParen,
-        Dot => Token::Dot,
+        Dot => Token::Dot, // unused for now
         Quote => Token::Quote,
         WhiteSpace => Token::WhiteSpace,
         Begin => Token::Begin,
