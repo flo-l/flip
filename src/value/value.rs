@@ -46,8 +46,8 @@ impl Value {
 
     pub fn get_list(&self) -> Option<Vec<Value>> {
         match self.data() {
-            &ValueData::List => {
-                unimplemented!(); // TODO
+            &ValueData::List(ref values) => {
+                Some(values.clone())
             },
             &ValueData::EmptyList => Some(vec![]),
             _ => None
@@ -118,35 +118,10 @@ impl Value {
     }
     pub fn new_list(elements: &[Value]) -> Value {
         if elements.len() == 0 { return Value::empty_list(); }
-        unimplemented!();
-        // TODO
-/*
-        let mut iter = elements.into_iter().rev();
-        let last = iter.next().unwrap(); // safe because list len must be >= 1
-        iter.fold(Value::new_pair(last.clone(), Value::empty_list()), |prev_pair, value| Value::new_pair(value.clone(), prev_pair))
-*/
+        Value::new_with(ValueData::List(elements.iter().cloned().collect()))
     }
 
     pub fn to_string(&self, interner: &StringInterner) -> String {
         self.data().to_string(interner)
-    }
-}
-
-pub struct ListIter<'a> {
-    current: &'a Value,
-}
-impl<'a> ListIter<'a> {
-    pub fn new(val: &'a Value) -> Self {
-        ListIter { current: val }
-    }
-}
-
-impl<'a> Iterator for ListIter<'a> {
-    type Item = &'a Value;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.current.data() {
-            // TODO
-            _ => None,
-        }
     }
 }

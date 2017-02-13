@@ -2,7 +2,6 @@ use std::ops::{Add, Sub, Mul, Div, Rem};
 use ::value::Value;
 use ::interpreter::Interpreter;
 use ::grammar;
-use super::special_forms::define;
 
 // Polymorphic equality
 eval_args!(fn poly_eq(args: &mut [Value]) -> Value {
@@ -25,6 +24,7 @@ type_checker!(symbol_, "symbol?", get_symbol);
 type_checker!(integer_, "integer?", get_integer);
 type_checker!(char_, "char?", get_char);
 type_checker!(string_, "string?", get_string);
+type_checker!(list_, "list?", get_list);
 
 eval_args!(fn procedure_(args: &mut [Value]) -> Value {
     check_arity!("procedure?", args.len(), 1);
@@ -159,30 +159,20 @@ comparison_operator!(gt, ">", PartialOrd::gt);
 comparison_operator!(ge, ">=", PartialOrd::ge);
 
 // List operations:
+// TODO maybe rename to first or head?
 eval_args!(fn car(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("car", args.len(), 1);
-
-    unimplemented!();
-    /* TODO maybe rename to first or head?
-    if let Some((a, _)) = args[0].get_pair() {
-        a.clone()
-    } else {
-        raise_condition!(format!("expected pair, got {}", &args[0].to_string(&interpreter.interner)));
-    }
-    */
+    let list = try_unwrap_type!("car", "list", Value::get_list, &args[0], interpreter);
+    assert_or_condition!(list.len() > 0, "expected list with len > 0");
+    list[0].clone()
 });
 
+// TODO maybe rename to rest?
 eval_args!(fn cdr(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("cdr", args.len(), 1);
-
-    unimplemented!();
-    /* TODO maybe rename to rest?
-    if let Some((_, b)) = args[0].get_pair() {
-        b.clone()
-    } else {
-        raise_condition!(format!("expected pair, got {}", &args[0].to_string(&interpreter.interner)));
-    }
-    */
+    let list = try_unwrap_type!("cdr", "list", Value::get_list, &args[0], interpreter);
+    assert_or_condition!(list.len() > 0, "expected list with len > 0");
+    Value::new_list(&list[1..])
 });
 
 eval_args!(fn list(args: &mut [Value]) -> Value {

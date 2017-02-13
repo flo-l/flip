@@ -1,4 +1,4 @@
-use ::value::{Value, ListIter, Proc};
+use ::value::{Value, Proc};
 use ::string_interner::StringInterner;
 use grammar::escape_char;
 use itertools::Itertools;
@@ -11,7 +11,7 @@ pub enum ValueData {
     Symbol(u64),
     String(String),
     EmptyList,
-    List,
+    List(Vec<Value>),
     Condition(Value),
     NativeProc(*const ()),
     Proc(Proc),
@@ -34,7 +34,7 @@ impl ValueData {
             &ValueData::String(ref x) => format!("\"{}\"", x),
             &ValueData::Condition(ref x) => format!("[CONDITION: {:?}]", x),
             &ValueData::EmptyList => format!("()"),
-            &ValueData::List => unimplemented!(), // TODO
+            &ValueData::List(ref values) => format!("({})", values.iter().map(|v| v.to_string(interner)).join(" ")),
             &ValueData::NativeProc(x) => format!("[NATIVE_PROC: {:?}]", x),
             &ValueData::Proc(ref p) => format!("[PROC: {}]", p.to_string(interner)),
             &ValueData::Recur(ref p) => format!("[RECUR: {}]", Value::new_list(&p).to_string(interner)),
