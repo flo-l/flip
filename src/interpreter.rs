@@ -60,8 +60,8 @@ impl Interpreter {
         self.add_str_to_current_scope("<=", Value::new_native_proc(native::le));
 
         self.add_str_to_current_scope("list", Value::new_native_proc(native::list));
-        self.add_str_to_current_scope("car", Value::new_native_proc(native::car));
-        self.add_str_to_current_scope("cdr", Value::new_native_proc(native::cdr));
+        self.add_str_to_current_scope("first", Value::new_native_proc(native::first));
+        self.add_str_to_current_scope("rest", Value::new_native_proc(native::rest));
 
         self.add_str_to_current_scope("symbol-space", Value::new_native_proc(native::symbol_space));
     }

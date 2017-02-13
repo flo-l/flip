@@ -159,18 +159,16 @@ comparison_operator!(gt, ">", PartialOrd::gt);
 comparison_operator!(ge, ">=", PartialOrd::ge);
 
 // List operations:
-// TODO maybe rename to first or head?
-eval_args!(fn car(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    check_arity!("car", args.len(), 1);
-    let list = try_unwrap_type!("car", "list", Value::get_list, &args[0], interpreter);
+eval_args!(fn first(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    check_arity!("first", args.len(), 1);
+    let list = try_unwrap_type!("first", "list", Value::get_list, &args[0], interpreter);
     assert_or_condition!(list.len() > 0, "expected list with len > 0");
     list[0].clone()
 });
 
-// TODO maybe rename to rest?
-eval_args!(fn cdr(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    check_arity!("cdr", args.len(), 1);
-    let list = try_unwrap_type!("cdr", "list", Value::get_list, &args[0], interpreter);
+eval_args!(fn rest(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
+    check_arity!("rest", args.len(), 1);
+    let list = try_unwrap_type!("rest", "list", Value::get_list, &args[0], interpreter);
     assert_or_condition!(list.len() > 0, "expected list with len > 0");
     Value::new_list(&list[1..])
 });
