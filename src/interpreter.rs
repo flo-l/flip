@@ -59,7 +59,6 @@ impl Interpreter {
         self.add_str_to_current_scope("<", Value::new_native_proc(native::lt));
         self.add_str_to_current_scope("<=", Value::new_native_proc(native::le));
 
-        self.add_str_to_current_scope("cons", Value::new_native_proc(native::cons));
         self.add_str_to_current_scope("list", Value::new_native_proc(native::list));
         self.add_str_to_current_scope("car", Value::new_native_proc(native::car));
         self.add_str_to_current_scope("cdr", Value::new_native_proc(native::cdr));

@@ -180,11 +180,6 @@ eval_args!(fn cdr(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     }
 });
 
-eval_args!(fn cons(args: &mut [Value]) -> Value {
-    check_arity!("cons", args.len(), 2);
-    Value::new_pair(args[0].clone(), args[1].clone())
-});
-
 eval_args!(fn list(args: &mut [Value]) -> Value {
     Value::new_list(args)
 });
