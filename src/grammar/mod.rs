@@ -12,6 +12,8 @@ use ::string_interner::StringInterner;
 
 pub use self::lexer::escape_char;
 
+static NO_INTERNER_ERROR_STRING: &'static str = "internal error: interner not set";
+
 pub fn parse<'input>(input: &'input str, interner: &mut StringInterner)
 -> Result<Vec<Value>, ::lalrpop_util::ParseError<usize, lexer::Token<'input>, error::Error>> {
     let tokenizer = lexer::Tokenizer::new(input);

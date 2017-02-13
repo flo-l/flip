@@ -1,9 +1,9 @@
 use std::iter;
 use ::value::Value;
 use ::string_interner::StringInterner;
-use ::grammar::lexer::unescape_string;
-use super::lexer::Token;
-use super::error::Error;
+use ::grammar::lexer::{unescape_string, Token};
+use ::grammar::NO_INTERNER_ERROR_STRING;
+use ::grammar::error::Error;
 
 #[LALR]
 grammar<'input>(text: &'input str, interner_valid: bool, interner: &mut StringInterner);
@@ -47,7 +47,6 @@ NonSpecialSymbol: Value = {
            "true" => Value::new_bool(true),
            "false" => Value::new_bool(false),
            s => {
-               assert!(interner_valid, "internal error: interner not set");
                Value::new_symbol(interner.intern(s))
            },
        }
@@ -250,11 +249,9 @@ SpecialFormRecur: Value = {
 // everything except for names of special forms and tail calls
 NonSpecialItem: Value = {
     Quote <Item> => {
-        assert!(interner_valid, "internal error: interner not set");
         Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
     },
     Quote <TailCall> => {
-        assert!(interner_valid, "internal error: interner not set");
         Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
     },
     Char,
@@ -284,6 +281,9 @@ TailCall: Value = {
 
 pub TopLevelItem: Vec<Value> = {
     WhiteSpace? <first:Item> <rest:Code?> WhiteSpace? => {
+        // this parser needs a valid interner
+        assert!(interner_valid, NO_INTERNER_ERROR_STRING);
+
         let first = iter::once(first);
         let rest = rest.into_iter().flat_map(|x| x.into_iter());
         first.chain(rest).collect()
