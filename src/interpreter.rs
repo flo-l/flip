@@ -63,8 +63,6 @@ impl Interpreter {
         self.add_str_to_current_scope("list", Value::new_native_proc(native::list));
         self.add_str_to_current_scope("car", Value::new_native_proc(native::car));
         self.add_str_to_current_scope("cdr", Value::new_native_proc(native::cdr));
-        self.add_str_to_current_scope("set-car!", Value::new_native_proc(native::set_car_));
-        self.add_str_to_current_scope("set-cdr!", Value::new_native_proc(native::set_cdr_));
 
         self.add_str_to_current_scope("symbol-space", Value::new_native_proc(native::symbol_space));
     }

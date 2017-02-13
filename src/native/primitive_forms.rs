@@ -189,46 +189,6 @@ eval_args!(fn list(args: &mut [Value]) -> Value {
     Value::new_list(args)
 });
 
-pub fn set_car_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    check_arity!("set-car!", args.len(), 2);
-
-    let (f, elem) = args.split_at(1);
-    let (f, elem) = (&f[0], &elem[0]);
-    if f.get_symbol().is_some() {
-        let old_pair = interpreter.evaluate(f);
-        if let Some((_, b)) = old_pair.get_pair() {
-            let new_pair = Value::new_pair(elem.clone(), b.clone());
-            let quote_id = interpreter.interner.intern("quote");
-            let quoted = Value::new_list(&[Value::new_symbol(quote_id), new_pair]);
-            define(interpreter, &mut [f.clone(), quoted])
-        } else {
-            raise_condition!(format!("expected pair, got {}", old_pair.to_string(&interpreter.interner)));
-        }
-    } else {
-        raise_condition!(format!("expected symbol, got {}", f.to_string(&interpreter.interner)));
-    }
-}
-
-pub fn set_cdr_(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
-    check_arity!("set-cdr!", args.len(), 2);
-
-    let (f, elem) = args.split_at(1);
-    let (f, elem) = (&f[0], &elem[0]);
-    if f.get_symbol().is_some() {
-        let old_pair = interpreter.evaluate(f);
-        if let Some((a, _)) = old_pair.get_pair() {
-            let new_pair = Value::new_pair(a.clone(), elem.clone());
-            let quote_id = interpreter.interner.intern("quote");
-            let quoted = Value::new_list(&[Value::new_symbol(quote_id), new_pair]);
-            define(interpreter, &mut [f.clone(), quoted])
-        } else {
-            raise_condition!(format!("expected pair, got {}", old_pair.to_string(&interpreter.interner)))
-        }
-    } else {
-        raise_condition!(format!("expected symbol, got {}", f.to_string(&interpreter.interner)));
-    }
-}
-
 pub fn symbol_space(interpreter: &mut Interpreter, args: &mut [Value]) -> Value {
     check_arity!("symbol-space", args.len(), 0);
 
