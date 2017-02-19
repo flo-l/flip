@@ -194,6 +194,18 @@ fn quote() {
     expect_ok!(parse, interner, "'#\\a", quoted(Value::new_char('a'), interner));
     expect_ok!(parse, interner, "'sym", quoted(Value::new_symbol(interner.intern("sym")), interner));
     expect_ok!(parse, interner, "'(1 2)", quoted(Value::new_list(&[Value::new_integer(1), Value::new_integer(2)]), interner));
+
+    // quoted lists should parse even if they contain invalid special forms
+    let special_forms = &["define", "quote", "if", "lambda", "let", "loop", "recur", "begin"];
+    for &special in special_forms {
+        let special_symbol = Value::new_symbol(interner.intern(special));
+        expect_ok!(parse, interner, format!("'({})", special), quoted(Value::new_list(&[special_symbol.clone()]), interner));
+        expect_ok!(parse, interner, format!("(quote ({}))", special), quoted(Value::new_list(&[special_symbol.clone()]), interner));
+        expect_ok!(parse, interner, format!("'(({}))", special), quoted(Value::new_list(&[Value::new_list(&[special_symbol.clone()])]), interner));
+        expect_ok!(parse, interner, format!("(quote (({})))", special), quoted(Value::new_list(&[Value::new_list(&[special_symbol.clone()])]), interner));
+        expect_ok!(parse, interner, format!("'(1 ({}))", special), quoted(Value::new_list(&[Value::new_integer(1), Value::new_list(&[special_symbol.clone()])]), interner));
+        expect_ok!(parse, interner, format!("(quote (1 ({})))", special), quoted(Value::new_list(&[Value::new_integer(1), Value::new_list(&[special_symbol.clone()])]), interner));
+    }
 }
 
 #[test]
