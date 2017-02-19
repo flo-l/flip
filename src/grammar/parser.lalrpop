@@ -16,7 +16,7 @@ extern {
         OpenParen => Token::OpenParen,
         ClosingParen => Token::ClosingParen,
         Dot => Token::Dot, // unused for now
-        Quote => Token::Quote,
+        QuoteTick => Token::QuoteTick,
         WhiteSpace => Token::WhiteSpace,
         Begin => Token::Begin,
         Define => Token::Define,
@@ -25,6 +25,7 @@ extern {
         Loop => Token::Loop,
         Lambda => Token::Lambda,
         Recur => Token::Recur,
+        Quote => Token::Quote,
         Chr => Token::Char(<char>),
         Int => Token::Integer(<i64>),
         Str => Token::String(<&'input str>),
@@ -32,12 +33,29 @@ extern {
     }
 }
 
+// PRIMITIVES
 Char: Value = {
     <c:Chr> => Value::new_char(c),
 };
 
 pub Integer: Value = {
     <i:Int> => Value::new_integer(i),
+};
+
+String: Value = {
+   <s:Str> => Value::new_string(unescape_string(s)),
+};
+
+EmptyList: Value = {
+    OpenParen WhiteSpace? ClosingParen => Value::empty_list(),
+};
+// --------------------------------------
+
+// SYMBOLS
+// all valid symbols
+Symbol: Value = {
+    NonSpecialSymbol,
+    SpecialSymbol,
 };
 
 // symbol which is not the name of a special form
@@ -54,7 +72,7 @@ NonSpecialSymbol: Value = {
 };
 
 // symbol which is the name of a special form
-SpecialSymbol: Value = {
+SpecialSymbolNotQuote: Value = {
     Begin => Value::new_symbol(interner.intern("begin")),
     Define => Value::new_symbol(interner.intern("define")),
     If => Value::new_symbol(interner.intern("if")),
@@ -64,20 +82,41 @@ SpecialSymbol: Value = {
     Recur => Value::new_symbol(interner.intern("recur")),
 };
 
-// all valid symbols
-Symbol: Value = {
-    NonSpecialSymbol,
-    SpecialSymbol,
+SpecialSymbol: Value = {
+    SpecialSymbolNotQuote,
+    Quote => Value::new_symbol(interner.intern("quote")),
+};
+// --------------------------------------
+
+// QUOTED stuff
+// code as data, without special forms
+SimpleItem: Value = {
+    Char,
+    Integer,
+    String,
+    Symbol,
+    SimpleList,
+    QuoteTick <SimpleItem> => {
+        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
+    },
+    // transformation of (quote ..) not necessary, as the code is treated as data anyway
 };
 
-String: Value = {
-   <s:Str> => Value::new_string(unescape_string(s)),
-};
+SimpleList: Value = {
+    EmptyList,
 
-EmptyList: Value = {
-    OpenParen WhiteSpace? ClosingParen => Value::empty_list(),
+    // 1+ elements
+    OpenParen WhiteSpace? <v:(SimpleItem WhiteSpace)*> <last:SimpleItem> WhiteSpace? ClosingParen => {
+        let start = v.into_iter().map(|(v, _)| v);
+        let last = iter::once(last);
+        let values: Vec<Value> = start.chain(last).collect();
+        Value::new_list(&values)
+    },
 };
+// --------------------------------------
 
+// UNQUOTED stuff
+// code as code, with special forms
 List: Value = {
     EmptyList,
 
@@ -96,7 +135,7 @@ List: Value = {
     },
 
     // quoted list
-    Quote OpenParen WhiteSpace? <v:(Item WhiteSpace)*> <last:Item> WhiteSpace? ClosingParen => {
+    QuoteTick OpenParen WhiteSpace? <v:(Item WhiteSpace)*> <last:Item> WhiteSpace? ClosingParen => {
         let first = v.into_iter().map(|(v, _)| v);
         let last = iter::once(last);
         let values: Vec<Value> = first.chain(last).collect();
@@ -106,7 +145,7 @@ List: Value = {
     },
 
     // quoted empty list
-    Quote OpenParen WhiteSpace? ClosingParen => {
+    QuoteTick OpenParen WhiteSpace? ClosingParen => {
         Value::new_list(&[Value::new_symbol(interner.intern("quote")), Value::empty_list()])
     }
 };
@@ -269,6 +308,8 @@ SpecialForm: Value  = {
     SpecialFormLoop,
     SpecialFormLambda,
 };
+// --------------------------------------
+
 
 // anything but rules corresponding to lists
 AnythingButList: Value = {
@@ -281,7 +322,7 @@ AnythingButList: Value = {
 
 // special rule for quoted stuff
 QuotedItem: Value = {
-    Quote <AnythingButList> => {
+    QuoteTick <AnythingButList> => {
         Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
     },
 };

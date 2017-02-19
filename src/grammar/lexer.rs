@@ -21,7 +21,7 @@ pub enum Token<'input> {
     OpenParen,
     ClosingParen,
     Dot,
-    Quote,
+    QuoteTick,
     WhiteSpace,
     Char(char),
     Integer(i64),
@@ -34,6 +34,7 @@ pub enum Token<'input> {
     Loop,
     Lambda,
     Recur,
+    Quote,
 }
 
 // Tokenzer state
@@ -99,7 +100,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                 // pos + 1 is safe, because all these chars have width 1 byte
                 (NewToken, pos, '(') => { self.next_char(); Finished((pos, Token::OpenParen, pos+1)) },
                 (NewToken, pos, ')') => { self.next_char(); Finished((pos, Token::ClosingParen, pos+1)) },
-                (NewToken, pos, '\'') => { self.next_char(); Finished((pos, Token::Quote, pos+1)) },
+                (NewToken, pos, '\'') => { self.next_char(); Finished((pos, Token::QuoteTick, pos+1)) },
                 (NewToken, pos, '.') => { self.next_char(); Finished((pos, Token::Dot, pos+1)) },
                 (NewToken, pos, '-') => Minus(pos),
                 (NewToken, pos, '"') => StringStart(pos),
@@ -171,6 +172,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                         "loop" => Token::Loop,
                         "lambda" => Token::Lambda,
                         "recur" => Token::Recur,
+                        "quote" => Token::Quote,
                         x => Token::Symbol(x),
                     };
 
