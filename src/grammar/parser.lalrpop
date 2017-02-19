@@ -94,6 +94,21 @@ List: Value = {
         let values: Vec<Value> = first.chain(middle).chain(last).collect();
         Value::new_list(&values)
     },
+
+    // quoted list
+    Quote OpenParen WhiteSpace? <v:(Item WhiteSpace)*> <last:Item> WhiteSpace? ClosingParen => {
+        let first = v.into_iter().map(|(v, _)| v);
+        let last = iter::once(last);
+        let values: Vec<Value> = first.chain(last).collect();
+        let list = Value::new_list(&values);
+
+        Value::new_list(&[Value::new_symbol(interner.intern("quote")), list])
+    },
+
+    // quoted empty list
+    Quote OpenParen WhiteSpace? ClosingParen => {
+        Value::new_list(&[Value::new_symbol(interner.intern("quote")), Value::empty_list()])
+    }
 };
 
 #[inline]
@@ -246,25 +261,40 @@ SpecialFormRecur: Value = {
     },
 };
 
-// everything except for names of special forms and tail calls
-NonSpecialItem: Value = {
-    Quote <Item> => {
-        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
-    },
-    Quote <TailCall> => {
-        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
-    },
-    Char,
-    Integer,
-    NonSpecialSymbol,
-    String,
-    List,
+SpecialForm: Value  = {
     SpecialFormBegin,
     SpecialFormDefine,
     SpecialFormIf,
     SpecialFormLet,
     SpecialFormLoop,
     SpecialFormLambda,
+};
+
+// anything but rules corresponding to lists
+AnythingButList: Value = {
+    Char,
+    Integer,
+    String,
+    NonSpecialSymbol,
+    SpecialSymbol,
+};
+
+// special rule for quoted stuff
+QuotedItem: Value = {
+    Quote <AnythingButList> => {
+        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
+    },
+};
+
+// everything except for names of special forms and tail calls
+NonSpecialItem: Value = {
+    QuotedItem,
+    Char,
+    Integer,
+    NonSpecialSymbol,
+    String,
+    List,
+    SpecialForm,
 };
 
 Item: Value = {
