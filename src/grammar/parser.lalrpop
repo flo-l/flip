@@ -72,7 +72,7 @@ NonSpecialSymbol: Value = {
 };
 
 // symbol which is the name of a special form
-SpecialSymbolNotQuote: Value = {
+SpecialSymbol: Value = {
     Begin => Value::new_symbol(interner.intern("begin")),
     Define => Value::new_symbol(interner.intern("define")),
     If => Value::new_symbol(interner.intern("if")),
@@ -80,10 +80,6 @@ SpecialSymbolNotQuote: Value = {
     Loop => Value::new_symbol(interner.intern("loop")),
     Lambda => Value::new_symbol(interner.intern("lambda")),
     Recur => Value::new_symbol(interner.intern("recur")),
-};
-
-SpecialSymbol: Value = {
-    SpecialSymbolNotQuote,
     Quote => Value::new_symbol(interner.intern("quote")),
 };
 // --------------------------------------
@@ -133,21 +129,6 @@ List: Value = {
         let values: Vec<Value> = first.chain(middle).chain(last).collect();
         Value::new_list(&values)
     },
-
-    // quoted list
-    QuoteTick OpenParen WhiteSpace? <v:(Item WhiteSpace)*> <last:Item> WhiteSpace? ClosingParen => {
-        let first = v.into_iter().map(|(v, _)| v);
-        let last = iter::once(last);
-        let values: Vec<Value> = first.chain(last).collect();
-        let list = Value::new_list(&values);
-
-        Value::new_list(&[Value::new_symbol(interner.intern("quote")), list])
-    },
-
-    // quoted empty list
-    QuoteTick OpenParen WhiteSpace? ClosingParen => {
-        Value::new_list(&[Value::new_symbol(interner.intern("quote")), Value::empty_list()])
-    }
 };
 
 #[inline]
@@ -300,6 +281,16 @@ SpecialFormRecur: Value = {
     },
 };
 
+SpecialFormQuote: Value = {
+    OpenParen WhiteSpace? Quote WhiteSpace <SimpleItem> WhiteSpace? ClosingParen => {
+        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
+    },
+    
+    QuoteTick <SimpleItem> => {
+        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
+    },
+};
+
 SpecialForm: Value  = {
     SpecialFormBegin,
     SpecialFormDefine,
@@ -307,29 +298,12 @@ SpecialForm: Value  = {
     SpecialFormLet,
     SpecialFormLoop,
     SpecialFormLambda,
+    SpecialFormQuote,
 };
 // --------------------------------------
 
-
-// anything but rules corresponding to lists
-AnythingButList: Value = {
-    Char,
-    Integer,
-    String,
-    NonSpecialSymbol,
-    SpecialSymbol,
-};
-
-// special rule for quoted stuff
-QuotedItem: Value = {
-    QuoteTick <AnythingButList> => {
-        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
-    },
-};
-
 // everything except for names of special forms and tail calls
 NonSpecialItem: Value = {
-    QuotedItem,
     Char,
     Integer,
     NonSpecialSymbol,
