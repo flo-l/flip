@@ -165,21 +165,21 @@ SpecialFormDefine: Value = {
 
 SpecialFormIf: Value = {
     OpenParen WhiteSpace? If WhiteSpace <cond:Item> WhiteSpace <then:Item> WhiteSpace <els:Item> WhiteSpace? ClosingParen => {
-        Value::new_list(&[Value::new_symbol(interner.intern("if")), cond, then, els])
+        Value::new_if(cond, then, els)
     },
 };
 
 SpecialFormIfTailCall: Value = {
     OpenParen WhiteSpace? If WhiteSpace <cond:Item> WhiteSpace <then:TailCall> WhiteSpace <els:Item> WhiteSpace? ClosingParen => {
-        Value::new_list(&[Value::new_symbol(interner.intern("if")), cond, then, els])
+        Value::new_if(cond, then, els)
     },
 
     OpenParen WhiteSpace? If WhiteSpace <cond:Item> WhiteSpace <then:Item> WhiteSpace <els:TailCall> WhiteSpace? ClosingParen => {
-        Value::new_list(&[Value::new_symbol(interner.intern("if")), cond, then, els])
+        Value::new_if(cond, then, els)
     },
 
     OpenParen WhiteSpace? If WhiteSpace <cond:Item> WhiteSpace <then:TailCall> WhiteSpace <els:TailCall> WhiteSpace? ClosingParen => {
-        Value::new_list(&[Value::new_symbol(interner.intern("if")), cond, then, els])
+        Value::new_if(cond, then, els)
     },
 };
 
@@ -285,7 +285,7 @@ SpecialFormQuote: Value = {
     OpenParen WhiteSpace? Quote WhiteSpace <SimpleItem> WhiteSpace? ClosingParen => {
         Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
     },
-    
+
     QuoteTick <SimpleItem> => {
         Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
     },
