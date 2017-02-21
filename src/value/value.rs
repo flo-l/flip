@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use std::mem;
 use std::char;
 use super::value_data::*;
-use ::value::{Proc, SpecialForm, If};
+use ::value::*;
 use ::interpreter::Interpreter;
 use ::scope::Scope;
 use ::string_interner::StringInterner;
@@ -37,6 +37,12 @@ impl Value {
     pub fn new_recur(args: Vec<Value>) -> Self { Self::new_with(ValueData::Recur(args)) }
     pub fn new_if(condition: Value, then: Value, or_else: Value) -> Self {
         Self::new_with(ValueData::SpecialForm(SpecialForm::If(If::new(condition, then, or_else))))
+    }
+    pub fn new_define(symbol_id: u64, expression: Value) -> Self {
+        Self::new_with(ValueData::SpecialForm(SpecialForm::Define(Define::new(symbol_id, expression))))
+    }
+    pub fn new_quote(expression: Value) -> Self {
+        Self::new_with(ValueData::SpecialForm(SpecialForm::Quote(Quote::new(expression))))
     }
 
     fn data(&self) -> &ValueData {

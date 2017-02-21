@@ -158,8 +158,8 @@ SpecialFormBeginTailCall: Value = {
 
 SpecialFormDefine: Value = {
     OpenParen WhiteSpace? Define WhiteSpace <name:Symbol> WhiteSpace <expr:Item> WhiteSpace? ClosingParen => {
-        let define = Value::new_symbol(interner.intern("define"));
-        Value::new_list(&[define, name, expr])
+        // unwrap safe because type is checked by parser
+        Value::new_define(name.get_symbol().unwrap(), expr)
     },
 };
 
@@ -283,11 +283,11 @@ SpecialFormRecur: Value = {
 
 SpecialFormQuote: Value = {
     OpenParen WhiteSpace? Quote WhiteSpace <SimpleItem> WhiteSpace? ClosingParen => {
-        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
+        Value::new_quote(<>)
     },
 
     QuoteTick <SimpleItem> => {
-        Value::new_list(&[Value::new_symbol(interner.intern("quote")), <>])
+        Value::new_quote(<>)
     },
 };
 
