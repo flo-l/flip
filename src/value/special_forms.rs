@@ -1,11 +1,11 @@
 use ::value::Value;
 use ::interpreter::Interpreter;
-use ::string_interner::StringInterner;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum SpecialForm {
     Define(Define),
     If(If),
+    Lambda(Lambda),
     Quote(Quote),
 }
 
@@ -14,15 +14,8 @@ impl SpecialForm {
         match self {
             &SpecialForm::Define(ref x) => x.evaluate(interpreter, args),
             &SpecialForm::If(ref x) => x.evaluate(interpreter, args),
+            &SpecialForm::Lambda(ref x) => x.evaluate(interpreter, args),
             &SpecialForm::Quote(ref x) => x.evaluate(interpreter, args),
-        }
-    }
-
-    pub fn to_string(&self, interner: &StringInterner) -> String {
-        match self {
-            &SpecialForm::Define(ref x) => x.to_string(interner),
-            &SpecialForm::If(ref x) => x.to_string(interner),
-            &SpecialForm::Quote(ref x) => x.to_string(interner),
         }
     }
 }
@@ -53,14 +46,6 @@ impl If {
             None => new_condition!(format!("if expected bool, found: {}", condition.to_string(&interpreter.interner)))
         }
     }
-
-    fn to_string(&self, interner: &StringInterner) -> String {
-        let condition = self.condition.to_string(interner);
-        let then = self.then.to_string(interner);
-        let or_else = self.or_else.to_string(interner);
-
-        format!("(if {} {} {})", condition, then, or_else)
-    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -84,13 +69,6 @@ impl Define {
         interpreter.current_scope.add_symbol(self.symbol_id, expr);
         Value::new_symbol(self.symbol_id)
     }
-
-    fn to_string(&self, interner: &StringInterner) -> String {
-        let symbol = Value::new_symbol(self.symbol_id).to_string(interner);
-        let expr = self.expression.to_string(interner);
-
-        format!("(define {} {})", symbol, expr)
-    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -109,9 +87,25 @@ impl Quote {
         assert!(args.len() == 0);
         self.expression.clone()
     }
+}
 
-    fn to_string(&self, interner: &StringInterner) -> String {
-        let expr = self.expression.to_string(interner);
-        format!("(quote {})", expr)
+#[derive(Debug, PartialEq, Clone)]
+pub struct Lambda {
+    name: Option<String>,
+    bindings: Vec<u64>,
+    code: Vec<Value>,
+}
+
+impl Lambda {
+    pub fn new(name: Option<String>, bindings: Vec<u64>, code: Vec<Value>) -> Self {
+        Lambda {
+            name: name,
+            bindings: bindings,
+            code: code,
+        }
+    }
+
+    fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
+        Value::new_proc(self.name.clone(), interpreter.current_scope.clone(), self.bindings.clone(), self.code.clone())
     }
 }

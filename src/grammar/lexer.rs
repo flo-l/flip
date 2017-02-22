@@ -27,6 +27,8 @@ pub enum Token<'input> {
     Integer(i64),
     String(&'input str),
     Symbol(&'input str),
+    True,
+    False,
     Begin,
     Define,
     If,
@@ -173,6 +175,8 @@ impl<'input> Iterator for Tokenizer<'input> {
                         "lambda" => Token::Lambda,
                         "recur" => Token::Recur,
                         "quote" => Token::Quote,
+                        "true" => Token::True,
+                        "false" => Token::False,
                         x => Token::Symbol(x),
                     };
 

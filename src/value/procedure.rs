@@ -13,7 +13,7 @@ pub struct Proc {
 }
 
 impl Proc {
-    pub fn new(name: Option<String>, parent_scope: Scope, bindings: Vec<u64>, code: Vec<Value>) -> Self {        
+    pub fn new(name: Option<String>, parent_scope: Scope, bindings: Vec<u64>, code: Vec<Value>) -> Self {
         Proc {
             name: name,
             parent_scope: parent_scope,

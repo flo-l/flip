@@ -18,6 +18,8 @@ extern {
         Dot => Token::Dot, // unused for now
         QuoteTick => Token::QuoteTick,
         WhiteSpace => Token::WhiteSpace,
+        True => Token::True,
+        False => Token::False,
         Begin => Token::Begin,
         Define => Token::Define,
         If => Token::If,
@@ -34,6 +36,11 @@ extern {
 }
 
 // PRIMITIVES
+Bool: Value = {
+    True => Value::new_bool(true),
+    False => Value::new_bool(false),
+};
+
 Char: Value = {
     <c:Chr> => Value::new_char(c),
 };
@@ -44,6 +51,14 @@ pub Integer: Value = {
 
 String: Value = {
    <s:Str> => Value::new_string(unescape_string(s)),
+};
+
+// things that are "auto quoting, i.e. these are always parsed the same no matter in which context"
+Primitive: Value = {
+    Bool,
+    Char,
+    Integer,
+    String,
 };
 
 EmptyList: Value = {
@@ -58,38 +73,40 @@ Symbol: Value = {
     SpecialSymbol,
 };
 
-// symbol which is not the name of a special form
-NonSpecialSymbol: Value = {
-   <s:Sym> => {
-       match s {
-           "true" => Value::new_bool(true),
-           "false" => Value::new_bool(false),
-           s => {
-               Value::new_symbol(interner.intern(s))
-           },
-       }
-   },
+// symbol which is the name of a special form
+SpecialTextualSymbol: &'input str = {
+    Begin => &"begin",
+    Define => &"define",
+    If => &"if",
+    Let => &"let",
+    Loop => &"loop",
+    Lambda => &"lambda",
+    Recur => &"recur",
+    Quote => &"quote",
 };
 
-// symbol which is the name of a special form
+// as value
 SpecialSymbol: Value = {
-    Begin => Value::new_symbol(interner.intern("begin")),
-    Define => Value::new_symbol(interner.intern("define")),
-    If => Value::new_symbol(interner.intern("if")),
-    Let => Value::new_symbol(interner.intern("let")),
-    Loop => Value::new_symbol(interner.intern("loop")),
-    Lambda => Value::new_symbol(interner.intern("lambda")),
-    Recur => Value::new_symbol(interner.intern("recur")),
-    Quote => Value::new_symbol(interner.intern("quote")),
+    <SpecialTextualSymbol> => Value::new_symbol(interner.intern(<>))
 };
+
+// symbol which is not the name of a special form
+NonSpecialSymbol: Value = {
+    <Sym> => Value::new_symbol(interner.intern(<>))
+};
+
+// any symbol as string
+TextualSymbol: &'input str = {
+    Sym,
+    SpecialTextualSymbol,
+};
+
 // --------------------------------------
 
 // QUOTED stuff
 // code as data, without special forms
 SimpleItem: Value = {
-    Char,
-    Integer,
-    String,
+    Primitive,
     Symbol,
     SimpleList,
     QuoteTick <SimpleItem> => {
@@ -157,9 +174,9 @@ SpecialFormBeginTailCall: Value = {
 };
 
 SpecialFormDefine: Value = {
-    OpenParen WhiteSpace? Define WhiteSpace <name:Symbol> WhiteSpace <expr:Item> WhiteSpace? ClosingParen => {
+    OpenParen WhiteSpace? Define WhiteSpace <name:TextualSymbol> WhiteSpace <expr:Item> WhiteSpace? ClosingParen => {
         // unwrap safe because type is checked by parser
-        Value::new_define(name.get_symbol().unwrap(), expr)
+        Value::new_define(interner.intern(name), expr)
     },
 };
 
@@ -238,37 +255,32 @@ SpecialFormLoop: Value = {
     },
 };
 
-LambdaArgs: Vec<Value> = {
+LambdaArgs: Vec<u64> = {
     OpenParen WhiteSpace? ClosingParen => {
         vec![]
     },
 
-    OpenParen WhiteSpace? <first:Symbol> <args:(WhiteSpace Symbol)*> WhiteSpace? ClosingParen => {
+    OpenParen WhiteSpace? <first:TextualSymbol> <args:(WhiteSpace TextualSymbol)*> WhiteSpace? ClosingParen => {
         let first = iter::once(first);
         let rest = args.into_iter().map(|(_, v)| v);
-        first.chain(rest).collect()
+        first.chain(rest).map(|s| interner.intern(s)).collect()
     }
 };
 
 SpecialFormLambda: Value = {
     // without tail call
-    OpenParen WhiteSpace? Lambda WhiteSpace <name:(Symbol WhiteSpace)?> <args:LambdaArgs> <code:Code> WhiteSpace? ClosingParen => {
-        let begin = iter::once(Value::new_symbol(interner.intern("lambda")));
-        let name = name.map(|(name, _)| name);
-        let args = iter::once(Value::new_list(&args));
-        let values: Vec<Value> = begin.chain(name).chain(args).chain(code.into_iter()).collect();
-        Value::new_list(&values)
+    OpenParen WhiteSpace? Lambda WhiteSpace <name:(TextualSymbol WhiteSpace)?> <bindings:LambdaArgs> <code:Code> WhiteSpace? ClosingParen => {
+        let name = name.map(|(name, _)| name.into());
+        Value::new_lambda(name, bindings, code)
     },
 
     // with tail call
-    OpenParen WhiteSpace? Lambda WhiteSpace <name:(Symbol WhiteSpace)?> <args:LambdaArgs> <code:Code?> WhiteSpace <last:TailCall> WhiteSpace? ClosingParen => {
-        let begin = iter::once(Value::new_symbol(interner.intern("lambda")));
-        let name = name.map(|(name, _)| name);
-        let args = iter::once(Value::new_list(&args));
-        let code = code.into_iter().flat_map(|x| x.into_iter());
+    OpenParen WhiteSpace? Lambda WhiteSpace <name:(TextualSymbol WhiteSpace)?> <bindings:LambdaArgs> <code:Code?> WhiteSpace <last:TailCall> WhiteSpace? ClosingParen => {
+        let name = name.map(|(name, _)| name.into());
         let last = iter::once(last);
-        let values: Vec<Value> = begin.chain(name).chain(args).chain(code).chain(last).collect();
-        Value::new_list(&values)
+        let code: Vec<Value> = code.into_iter().flat_map(|x| x.into_iter()).chain(last).collect();
+
+        Value::new_lambda(name, bindings, code)
     },
 };
 
@@ -304,10 +316,8 @@ SpecialForm: Value  = {
 
 // everything except for names of special forms and tail calls
 NonSpecialItem: Value = {
-    Char,
-    Integer,
+    Primitive,
     NonSpecialSymbol,
-    String,
     List,
     SpecialForm,
 };

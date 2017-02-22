@@ -41,6 +41,9 @@ impl Value {
     pub fn new_define(symbol_id: u64, expression: Value) -> Self {
         Self::new_with(ValueData::SpecialForm(SpecialForm::Define(Define::new(symbol_id, expression))))
     }
+    pub fn new_lambda(name: Option<String>, bindings: Vec<u64>, code: Vec<Value>) -> Self {
+        Self::new_with(ValueData::SpecialForm(SpecialForm::Lambda(Lambda::new(name, bindings, code))))
+    }
     pub fn new_quote(expression: Value) -> Self {
         Self::new_with(ValueData::SpecialForm(SpecialForm::Quote(Quote::new(expression))))
     }

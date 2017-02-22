@@ -39,7 +39,7 @@ impl ValueData {
             &ValueData::NativeProc(x) => format!("[NATIVE_PROC: {:?}]", x),
             &ValueData::Proc(ref p) => format!("[PROC: {}]", p.to_string(interner)),
             &ValueData::Recur(ref p) => format!("[RECUR: {}]", Value::new_list(&p).to_string(interner)),
-            &ValueData::SpecialForm(ref s) => s.to_string(interner),
+            &ValueData::SpecialForm(_) => unimplemented!(),
         }
     }
 }
