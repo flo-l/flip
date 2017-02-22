@@ -200,58 +200,57 @@ SpecialFormIfTailCall: Value = {
     },
 };
 
-BindingList: Vec<Value> = {
+BindingList: Vec<(u64, Value)> = {
     OpenParen WhiteSpace? ClosingParen => {
         vec![]
     },
 
-    OpenParen WhiteSpace? <name:Symbol> WhiteSpace <expr:Item> <rest:(WhiteSpace Symbol WhiteSpace Item)*> WhiteSpace? ClosingParen => {
-        // make it linear again for now
-        let name = iter::once(name);
-        let expr = iter::once(expr);
-        let rest = rest.into_iter().flat_map(|(_, name, _, expr)| iter::once(name).chain(iter::once(expr)));
-        name.chain(expr).chain(rest).collect()
+    OpenParen WhiteSpace? <name:TextualSymbol> WhiteSpace <expr:Item> <rest:(WhiteSpace TextualSymbol WhiteSpace Item)*> WhiteSpace? ClosingParen => {
+        let first = iter::once((name, expr));
+        let rest = rest.into_iter().map(|(_, name, _, expr)| (name, expr));
+        first.chain(rest).map(|(name, expr)| (interner.intern(name), expr)).collect()
     },
 };
 
 SpecialFormLet: Value = {
     OpenParen WhiteSpace? Let WhiteSpace <bindings:BindingList> <code:Code> WhiteSpace? ClosingParen => {
-        let begin = iter::once(Value::new_symbol(interner.intern("let")));
-        let bindings = iter::once(Value::new_list(&bindings));
-        let values: Vec<Value> = begin.chain(bindings).chain(code.into_iter()).collect();
-        Value::new_list(&values)
+        Value::new_let(bindings, code)
     },
 };
 
 SpecialFormLetTailCall: Value = {
     OpenParen WhiteSpace? Let WhiteSpace <bindings:BindingList> <code:Code?> WhiteSpace <last:TailCall> WhiteSpace? ClosingParen => {
-        let begin = iter::once(Value::new_symbol(interner.intern("let")));
-        let bindings = iter::once(Value::new_list(&bindings));
-        let code = code.into_iter().flat_map(|x| x.into_iter());
+        let begin = code.into_iter().flat_map(|x| x.into_iter());
         let last = iter::once(last);
-        let values: Vec<Value> = begin.chain(bindings).chain(code).chain(last).collect();
-        Value::new_list(&values)
+        let code: Vec<Value> = begin.chain(last).collect();
+        Value::new_let(bindings, code)
     },
 };
 
 SpecialFormLoop: Value = {
     // without tail call
     OpenParen WhiteSpace? Loop WhiteSpace <bindings:BindingList> <code:Code> WhiteSpace? ClosingParen => {
+        /*
         let begin = iter::once(Value::new_symbol(interner.intern("loop")));
         let bindings = iter::once(Value::new_list(&bindings));
         let code = code.into_iter();
         let values: Vec<Value> = begin.chain(bindings).chain(code).collect();
         Value::new_list(&values)
+        */
+        unimplemented!()
     },
 
     // with tail call
     OpenParen WhiteSpace? Loop WhiteSpace <bindings:BindingList> <code:Code?> WhiteSpace <last:TailCall> WhiteSpace? ClosingParen => {
+        /*
         let begin = iter::once(Value::new_symbol(interner.intern("loop")));
         let bindings = iter::once(Value::new_list(&bindings));
         let code = code.into_iter().flat_map(|x| x.into_iter());
         let last = iter::once(last);
         let values: Vec<Value> = begin.chain(bindings).chain(code).chain(last).collect();
         Value::new_list(&values)
+        */
+        unimplemented!()
     },
 };
 
