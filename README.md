@@ -30,7 +30,6 @@ In no particular order and incomplete:
   - Bool (true & false, not #t & #f)
   - Char
   - Integer (i64, no floats)
-  - Pair
   - List
   - String (UTF8)
   - Symbol (ASCII, interned strings)
@@ -43,10 +42,9 @@ In no particular order and incomplete:
 
 - Define items in current scope with (define *name* *whatever*)
 
-- Define rust fns and make them callable in scheme (see src/native.rs for examples)
-  - I implemented some stuff, like basic math, list operations, etc. all in native.rs with a ton of macros to reduce boilerplate
-  - Also all special forms like if, lambda etc. are implemented there
-  - Type conversions also in native.rs
+- Define rust fns and make them callable in scheme (see src/native for examples)
+  - I implemented some stuff, like basic math, list operations, etc. all in src/native/primitive_forms.rs with a ton of macros to reduce boilerplate
+  - Type conversions also in src/native/primitive_forms.rs
 
 - Create scheme procedures with (lambda *optional_name* (args*) code)
   - They have their own scope
