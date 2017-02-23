@@ -211,12 +211,12 @@ deterministically.
 
 ## begin
 
-`(begin expr* last)`
+`(begin expr* last?)`
 
 - expr: some s-expressions
 - last: some s-expression
 
-Evaluates all `expr`essions and `last`, returns the value of `last`.
+Evaluates all `expr`essions and `last`, returns the value of `last` or `()` if called without arguments.
 
 ### Examples
 
@@ -228,4 +228,7 @@ Evaluates all `expr`essions and `last`, returns the value of `last`.
   => 3
 a
   => 1
+
+(begin)
+  => ()
 ```
