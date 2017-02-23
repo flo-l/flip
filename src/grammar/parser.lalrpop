@@ -156,10 +156,9 @@ Code: Vec<Value> = {
 };
 
 SpecialFormBegin: Value = {
-    OpenParen WhiteSpace? Begin <code:Code> WhiteSpace? ClosingParen => {
-        let begin = iter::once(Value::new_symbol(interner.intern("begin")));
-        let values: Vec<Value> = begin.chain(code.into_iter()).collect();
-        Value::new_list(&values)
+    OpenParen WhiteSpace? Begin <code:Code?> WhiteSpace? ClosingParen => {
+        let code = code.unwrap_or(vec![]);
+        Value::new_begin(code)
     },
 };
 
@@ -230,27 +229,16 @@ SpecialFormLetTailCall: Value = {
 SpecialFormLoop: Value = {
     // without tail call
     OpenParen WhiteSpace? Loop WhiteSpace <bindings:BindingList> <code:Code> WhiteSpace? ClosingParen => {
-        /*
-        let begin = iter::once(Value::new_symbol(interner.intern("loop")));
-        let bindings = iter::once(Value::new_list(&bindings));
-        let code = code.into_iter();
-        let values: Vec<Value> = begin.chain(bindings).chain(code).collect();
-        Value::new_list(&values)
-        */
-        unimplemented!()
+        // this can be implemented with let as there is definitely no tail call
+        Value::new_let(bindings, code)
     },
 
     // with tail call
     OpenParen WhiteSpace? Loop WhiteSpace <bindings:BindingList> <code:Code?> WhiteSpace <last:TailCall> WhiteSpace? ClosingParen => {
-        /*
-        let begin = iter::once(Value::new_symbol(interner.intern("loop")));
-        let bindings = iter::once(Value::new_list(&bindings));
         let code = code.into_iter().flat_map(|x| x.into_iter());
         let last = iter::once(last);
-        let values: Vec<Value> = begin.chain(bindings).chain(code).chain(last).collect();
-        Value::new_list(&values)
-        */
-        unimplemented!()
+        let code: Vec<Value> = code.chain(last).collect();
+        Value::new_loop(bindings, code)
     },
 };
 
@@ -285,10 +273,8 @@ SpecialFormLambda: Value = {
 
 SpecialFormRecur: Value = {
     OpenParen WhiteSpace? Recur <args:Code?> WhiteSpace? ClosingParen => {
-        let begin = iter::once(Value::new_symbol(interner.intern("recur")));
-        let args = args.into_iter().flat_map(|x| x.into_iter());
-        let values: Vec<Value> = begin.chain(args).collect();
-        Value::new_list(&values)
+        let bindings = args.unwrap_or(vec![]);
+        Value::new_recur_form(bindings)
     },
 };
 

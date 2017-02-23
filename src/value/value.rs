@@ -35,17 +35,26 @@ impl Value {
     }
 
     pub fn new_recur(args: Vec<Value>) -> Self { Self::new_with(ValueData::Recur(args)) }
-    pub fn new_if(condition: Value, then: Value, or_else: Value) -> Self {
-        Self::new_with(ValueData::SpecialForm(SpecialForm::If(If::new(condition, then, or_else))))
+    pub fn new_begin(code: Vec<Value>) -> Self {
+        Self::new_with(ValueData::SpecialForm(SpecialForm::Begin(Begin::new(code))))
     }
     pub fn new_define(symbol_id: u64, expression: Value) -> Self {
         Self::new_with(ValueData::SpecialForm(SpecialForm::Define(Define::new(symbol_id, expression))))
+    }
+    pub fn new_if(condition: Value, then: Value, or_else: Value) -> Self {
+        Self::new_with(ValueData::SpecialForm(SpecialForm::If(If::new(condition, then, or_else))))
     }
     pub fn new_lambda(name: Option<String>, bindings: Vec<u64>, code: Vec<Value>) -> Self {
         Self::new_with(ValueData::SpecialForm(SpecialForm::Lambda(Lambda::new(name, bindings, code))))
     }
     pub fn new_let(bindings: Vec<(u64, Value)>, code: Vec<Value>) -> Self {
-        Self::new_with(ValueData::SpecialForm(SpecialForm::Let(Let::new(bindings, code))))
+        Self::new_with(ValueData::SpecialForm(SpecialForm::Let(LetLoop::new(bindings, code))))
+    }
+    pub fn new_loop(bindings: Vec<(u64, Value)>, code: Vec<Value>) -> Self {
+        Self::new_with(ValueData::SpecialForm(SpecialForm::Loop(LetLoop::new(bindings, code))))
+    }
+    pub fn new_recur_form(bindings: Vec<Value>) -> Self {
+        Self::new_with(ValueData::SpecialForm(SpecialForm::RecurForm(RecurForm::new(bindings))))
     }
     pub fn new_quote(expression: Value) -> Self {
         Self::new_with(ValueData::SpecialForm(SpecialForm::Quote(Quote::new(expression))))

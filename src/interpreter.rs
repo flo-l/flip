@@ -6,7 +6,6 @@ use ::string_interner::StringInterner;
 pub struct Interpreter {
     pub interner: StringInterner,
     pub current_scope: Scope,
-    pub recur_lock: bool,
 }
 
 impl Interpreter {
@@ -14,7 +13,6 @@ impl Interpreter {
         let mut interpreter = Interpreter {
             interner: StringInterner::new(),
             current_scope: Scope::new(),
-            recur_lock: false,
         };
         interpreter.init();
         interpreter
@@ -22,7 +20,7 @@ impl Interpreter {
 
     fn init(&mut self) {
         self.add_str_to_current_scope("eq?", Value::new_native_proc(native::poly_eq));
-        
+
         self.add_str_to_current_scope("null?", Value::new_native_proc(native::null_));
         self.add_str_to_current_scope("boolean?", Value::new_native_proc(native::boolean_));
         self.add_str_to_current_scope("symbol?", Value::new_native_proc(native::symbol_));
@@ -60,9 +58,7 @@ impl Interpreter {
 
     pub fn evaluate(&mut self, value: &Value) -> Value {
         let res: Value;
-        if self.recur_lock {
-            res = Value::new_condition(Value::new_string("recur in non-tail position"));
-        } else if let Some(mut list) = value.get_list() {
+        if let Some(mut list) = value.get_list() {
             if list.len() > 0 {
                 let (func, mut args) = list.split_at_mut(1);
                 let func = self.evaluate(&func[0]);

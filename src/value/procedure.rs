@@ -1,4 +1,4 @@
-use ::value::Value;
+use ::value::{Value, LetLoop};
 use ::scope::Scope;
 use ::interpreter::Interpreter;
 use ::string_interner::StringInterner;
@@ -23,57 +23,12 @@ impl Proc {
     }
 
     pub fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
-        if self.bindings.len() != args.len() {
-            let name = self.name.clone().unwrap_or("lambda".into());
-            return Value::new_condition(Value::new_string(
-                format!("arity mismatch for {}: expected: {}, got: {}", name, self.bindings.len(), args.len())));
-        }
-
-        let mut res;
-
-        // evaluate args in current scope
-        let mut evaluated_args: Vec<Value> = args.iter().map(|x| interpreter.evaluate(x)).collect();
-
-        // backup current scope
-        let old_scope = interpreter.current_scope.clone(); // this is just one Rc::clone
-
-        // create new scope for fn from fns parent scope
-        interpreter.current_scope = self.parent_scope.new_child();
-
-        // loop for recur
-        loop {
-            // add args to fn scope
-            for (&binding, value) in self.bindings.iter().zip(evaluated_args.iter()) {
-                interpreter.current_scope.add_symbol(binding, value.clone());
-            }
-
-            // evaluate code in fn scope
-            for body in self.code.iter().take(self.code.len() - 1) {
-                let res = interpreter.evaluate(body);
-
-                // check for invalid recursion
-                if let Some(_) = res.get_recur() {
-                    interpreter.recur_lock = false;
-                    raise_condition!("recur in non-tail position")
-                }
-            }
-
-            res = interpreter.evaluate(&self.code.last().unwrap()); // safe because of arity check
-
-            // check for recursion
-            if let Some(args) = res.get_recur() {
-                interpreter.recur_lock = false;
-                check_arity!("recur", args.len(), evaluated_args.len() as u32);
-                evaluated_args = args.iter().cloned().collect();
-                continue;
-            }
-
-            break;
-        }
-
-        interpreter.current_scope = old_scope;
-        res
+        // every function's body is enclosed in an implicit loop
+        let bindings: Vec<(u64, Value)> = self.bindings.iter().cloned().zip(args.iter().cloned()).collect();
+        let implicit_loop = LetLoop::new(bindings, self.code.clone());
+        implicit_loop.evaluate_loop(interpreter, &[])
     }
+
 
     pub fn to_string(&self, interner: &StringInterner) -> String {
         let name = self.name.as_ref().map(|x| &**x).unwrap_or("lambda");
