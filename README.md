@@ -1,5 +1,5 @@
-My take on implementing a lisp-like language in Rust
-======================
+FLIP — Flo's LISP
+====================
 
 This is just for fun. The code is opensource, because I was looking for similar projects
 before I started and couldn't find many. So feel free to inspire yourself if you want to write

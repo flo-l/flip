@@ -1,6 +1,6 @@
 [package]
-name = "scheme"
-version = "0.1.0"
+name = "flip"
+version = "0.2.0"
 authors = ["flo-l <lacknerflo@gmail.com>"]
 build = "build.rs" # LALRPOP preprocessing
 
