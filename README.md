@@ -9,7 +9,7 @@ I initially followed this marvelous guide: [Scheme from Scratch](http://peter.mi
 
 Afterwards I've taken the liberty of diverging from the official scheme spec wherever I felt like it.
 I didn't implement automatic tail-call-optimization for example. Instead I did it the
-clojure way with `recur`.
+clojure way (:copyright:) with `recur`.
 
 I'd love to receive feedback on the code, so if you want to chat about it, ask a question
 or propose an improvement feel free to open an issue on GitHub!
@@ -40,34 +40,34 @@ In no particular order and incomplete:
 
 - Evaluate S-expressions
 
-- Define items in current scope with (define *name* *whatever*)
+- Define items in current scope with `(define *name* *whatever*)`
 
-- Define rust fns and make them callable in scheme (see src/native for examples)
-  - I implemented some stuff, like basic math, list operations, etc. all in src/native/primitive_forms.rs with a ton of macros to reduce boilerplate
-  - Type conversions also in src/native/primitive_forms.rs
+- Define rust fns and make them callable in flip (see `src/native` for examples)
+  - I implemented some stuff, like basic math, list operations, etc. all in `src/native/primitive_forms.rs` with a ton of macros to reduce boilerplate
+  - Type conversions also in `src/native/primitive_forms.rs`
 
-- Create scheme procedures with (lambda *optional_name* (args*) code)
+- Create procedures with `(lambda *optional_name* (args*) code)`
   - They have their own scope
 
 - GC: No, just Rc for all values
 
 - Dynamic scopes
-  - (let (x 1 y 2 z (+ x y)) (list x y z)) gives you (1 2 3)
+  - `(let (x 1 y 2 z (+ x y)) (list x y z))` gives you `(1 2 3)`
   - let behaves like let* in clojure
-  - there's also loop, which works like let, but establishes a recursion point, see clojure docs
+  - there's also `loop`, which works like let, but establishes a recursion point, see clojure docs
 
 - Tail calls
-  - (recur arg1 arg2 ..) will make a tail call
+  - `(recur arg1 arg2 ..)` will make a tail call
   - works the same as in clojure
   - recur should only be used in tail position
   - when recur is evaluated, code execution jumps to the next recursion point
   - lambda and loop both create a recursion point
-  - example: (loop (x 1) (if (< x 10) (recur (+ x 1)) x )) this is a tail-call-optimized loop that counts from 1 to 10
+  - example: `(loop (x 1) (if (< x 10) (recur (+ x 1)) x ))` this is a tail-call-optimized loop that counts from 1 to 10
 
 ###Planned Features
 
 - Conditions
-- Refactor Value so that it doesn't use Rc for everything, just Strings and Pairs maybe
+- Refactor Value so that it doesn't use Rc for everything, just Strings and Lists maybe
 - Float support
 - Maybe a better tokenizer with nom
 - Concurrency
