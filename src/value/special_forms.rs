@@ -14,16 +14,16 @@ pub enum SpecialForm {
 }
 
 impl SpecialForm {
-    pub fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
+    pub fn evaluate(&self, interpreter: &mut Interpreter) -> Value {
         match self {
-            &SpecialForm::Begin(ref x) => x.evaluate(interpreter, args),
-            &SpecialForm::Define(ref x) => x.evaluate(interpreter, args),
-            &SpecialForm::If(ref x) => x.evaluate(interpreter, args),
-            &SpecialForm::Lambda(ref x) => x.evaluate(interpreter, args),
-            &SpecialForm::Let(ref x) => x.evaluate_let(interpreter, args),
-            &SpecialForm::Loop(ref x) => x.evaluate_loop(interpreter, args),
-            &SpecialForm::RecurForm(ref x) => x.evaluate(interpreter, args),
-            &SpecialForm::Quote(ref x) => x.evaluate(interpreter, args),
+            &SpecialForm::Begin(ref x) => x.evaluate(interpreter),
+            &SpecialForm::Define(ref x) => x.evaluate(interpreter),
+            &SpecialForm::If(ref x) => x.evaluate(interpreter),
+            &SpecialForm::Lambda(ref x) => x.evaluate(interpreter),
+            &SpecialForm::Let(ref x) => x.evaluate_let(interpreter),
+            &SpecialForm::Loop(ref x) => x.evaluate_loop(interpreter),
+            &SpecialForm::RecurForm(ref x) => x.evaluate(interpreter),
+            &SpecialForm::Quote(ref x) => x.evaluate(interpreter),
         }
     }
 }
@@ -44,10 +44,8 @@ impl If {
         }
     }
 
-    fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
-        assert!(args.len() == 0);
+    fn evaluate(&self, interpreter: &mut Interpreter) -> Value {
         let condition = interpreter.evaluate(&self.condition);
-
         match condition.get_bool() {
             Some(true)  => interpreter.evaluate(&self.then),
             Some(false) => interpreter.evaluate(&self.or_else),
@@ -70,10 +68,8 @@ impl Define {
         }
     }
 
-    fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
-        assert!(args.len() == 0);
+    fn evaluate(&self, interpreter: &mut Interpreter) -> Value {
         let expr = interpreter.evaluate(&self.expression);
-
         interpreter.current_scope.add_symbol(self.symbol_id, expr);
         Value::new_symbol(self.symbol_id)
     }
@@ -91,8 +87,7 @@ impl Quote {
         }
     }
 
-    fn evaluate(&self, _: &mut Interpreter, args: &[Value]) -> Value {
-        assert!(args.len() == 0);
+    fn evaluate(&self, _: &mut Interpreter) -> Value {
         self.expression.clone()
     }
 }
@@ -113,8 +108,7 @@ impl Lambda {
         }
     }
 
-    fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
-        assert!(args.len() == 0);
+    fn evaluate(&self, interpreter: &mut Interpreter) -> Value {
         Value::new_proc(self.name.clone(), interpreter.current_scope.clone(), self.bindings.clone(), self.code.clone())
     }
 }
@@ -133,8 +127,7 @@ impl LetLoop {
         }
     }
 
-    fn evaluate_let(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
-        assert!(args.len() == 0);
+    fn evaluate_let(&self, interpreter: &mut Interpreter) -> Value {
         // replace interpreter scope with fresh child scope
         let parent_scope = interpreter.current_scope.clone();
         interpreter.current_scope = parent_scope.new_child();
@@ -158,8 +151,7 @@ impl LetLoop {
     }
 
     // pub because this is also used for procs
-    pub fn evaluate_loop(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
-        assert!(args.len() == 0);
+    pub fn evaluate_loop(&self, interpreter: &mut Interpreter) -> Value {
         // replace interpreter scope with fresh child scope
         let parent_scope = interpreter.current_scope.clone();
         interpreter.current_scope = parent_scope.new_child();
@@ -211,8 +203,7 @@ impl RecurForm {
         }
     }
 
-    fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
-        assert!(args.len() == 0);
+    fn evaluate(&self, interpreter: &mut Interpreter) -> Value {
         let evaluated_bindings = self.bindings.iter().map(|b| interpreter.evaluate(b)).collect();
         Value::new_recur(evaluated_bindings)
     }
@@ -230,8 +221,7 @@ impl Begin {
         }
     }
 
-    fn evaluate(&self, interpreter: &mut Interpreter, args: &[Value]) -> Value {
-        assert!(args.len() == 0);
+    fn evaluate(&self, interpreter: &mut Interpreter) -> Value {
         let evaluated_code = self.code.iter().map(|b| interpreter.evaluate(b)).last();
         evaluated_code.unwrap_or(Value::empty_list())
     }

@@ -74,7 +74,7 @@ impl Interpreter {
                 res = Value::new_condition(Value::new_string(format!("tried to evaluate ()")));
             };
         } else if let Some(special_form) = value.get_special_form() {
-            res = special_form.evaluate(self, &[]);
+            res = special_form.evaluate(self);
         } else if let Some(symbol) = value.get_symbol() {
             res = self.current_scope
             .lookup_symbol(symbol)

@@ -26,7 +26,7 @@ impl Proc {
         // every function's body is enclosed in an implicit loop
         let bindings: Vec<(u64, Value)> = self.bindings.iter().cloned().zip(args.iter().cloned()).collect();
         let implicit_loop = LetLoop::new(bindings, self.code.clone());
-        implicit_loop.evaluate_loop(interpreter, &[])
+        implicit_loop.evaluate_loop(interpreter)
     }
 
 
